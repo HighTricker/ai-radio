@@ -3,7 +3,7 @@
 provider 选择由 settings.llm_provider 决定，模型名由 settings.llm_model 决定
 （缺省走 PROVIDERS 配置里的 default_model）；详见 services/llm_providers.py。
 
-支持多文案 mode：song_intro / classic_prose / history_today / quotation / weather_mood
+支持 3 个文案 mode：song_intro（纯歌曲介绍）/ song_intro_taste（结合听歌史的歌曲介绍）/ weather_mood（天气感悟）
 每个 mode 对应 prompts/{mode}.md 一个 string.Template 模板。
 接受 target_chars 参数实现 DJ 时间对齐（旁白长度 ≈ 前奏长度）
 """
@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 AI_RADIO_DIR = Path(__file__).resolve().parent.parent.parent
 PROMPTS_DIR = AI_RADIO_DIR / "prompts"
 
-SUPPORTED_MODES = ("song_intro", "classic_prose", "history_today", "quotation", "weather_mood")
-DEFAULT_MODE = "song_intro"
+SUPPORTED_MODES = ("song_intro", "song_intro_taste", "weather_mood")
+DEFAULT_MODE = "song_intro_taste"
 
 
 def _format_weather_block(env: dict | None) -> str:
@@ -98,24 +98,13 @@ def generate_script(
     max_chars = target_chars + 10
     today = datetime.now().strftime("%Y 年 %m 月 %d 日")
 
-    # V3 #7 / V3.1：按 mode 注入真实事实，避免 LLM 编造
+    # 按 mode 注入真实事实，避免 LLM 编造。
+    # song_intro（纯歌曲介绍）不注入任何素材；其余两档各自注入。
     fact_block = ""
-    if mode == "history_today":
-        from services.facts import format_history_for_prompt
-        body = format_history_for_prompt()
-        fact_block = (
-            f"【可选事实素材：{today} 在历史上】\n{body}"
-            if body
-            else "【提示】历史素材本次不可用，请按写作要求中的「素材为空时」处理。"
-        )
-    elif mode == "quotation":
-        from services.facts import pick_quotation
-        q = pick_quotation()
-        fact_block = f"【今夜的引语】\n{q}" if q else "【提示】引语库本次不可用，请自由起笔。"
-    elif mode == "weather_mood":
+    if mode == "weather_mood":
         fact_block = _format_weather_block(environment)
-    elif mode == "song_intro" and entry is not None:
-        # V4.0 STEP 2：注入用户听歌史（宏观画像 + 当首歌相关事实）
+    elif mode == "song_intro_taste" and entry is not None:
+        # 结合听歌史：注入用户听歌画像（宏观画像 + 当首歌相关事实）
         from services.listening_facts import get_macro_background, pick_for_entry
         macro = get_macro_background()
         specific = pick_for_entry(entry)
