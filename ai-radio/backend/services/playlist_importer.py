@@ -67,7 +67,7 @@ def _is_noise_line(line: str) -> bool:
         return True
     if s.startswith(("#", ">", "//", "—", "─", "===", "---")):
         return True
-    if re.fullmatch(r"[\d,\s亿万千百播放次听]+", s):  # 纯播放量
+    if re.fullmatch(r"[\d,.\s亿万千百播放次听]+", s):  # 纯播放量（含小数，如 1.2亿）
         return True
     if s.startswith(("http://", "https://", "www.")):
         return True
