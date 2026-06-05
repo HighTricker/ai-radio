@@ -48,9 +48,7 @@ from services.song_cache import SONG_CACHE_DIR, cache_path, fetch_and_cache
 # 文案模式中文名（前端显示用）
 MODE_LABELS: dict[str, str] = {
     "song_intro": "歌曲介绍",
-    "classic_prose": "散文",
-    "history_today": "今日掌故",
-    "quotation": "一句话",
+    "song_intro_taste": "懂你的歌曲介绍",
     "weather_mood": "天气感悟",
 }
 
@@ -399,7 +397,7 @@ def get_episode(
     direction:
       - "next"（默认）：cursor 指向的下一首
       - "prev"：上一首（cursor 倒退 2 位再 +1 = 上一首）
-    mode: 文案模式 (song_intro / classic_prose / history_today / quotation)；未知 mode 自动回退到 song_intro
+    mode: 文案模式（song_intro / song_intro_taste / weather_mood）；未知 mode 自动回退到 DEFAULT_MODE
     """
     if mode not in SUPPORTED_MODES:
         logger.warning(f"未知文案模式 {mode}，回退到 {DEFAULT_MODE}")
