@@ -49,10 +49,35 @@ cd ai-radio
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r backend/requirements.txt
-# QQ 音乐服务的额外依赖见 third_party/QQMusicApi 的安装说明
 ```
 
-### 2. 配置凭证
+### 2. 安装 QQ 音乐服务（QQMusicApi）
+
+QQ 音乐源依赖第三方服务 [QQMusicApi](https://github.com/luren-dc/QQMusicApi)（**本仓未包含，需自行获取**）：
+
+```powershell
+# 在项目根目录
+git clone https://github.com/luren-dc/QQMusicApi third_party/QQMusicApi
+pip install -r third_party/QQMusicApi/requirements.txt   # 具体依赖以其 README 为准
+```
+
+再把它的配置改成本项目需要的几项 —— 复制 `web/config.example.toml` 为 `web/config.toml`，修改这 4 处：
+
+```toml
+[server]
+host = "0.0.0.0"   # 让浏览器/局域网能访问扫码页
+workers = 1        # 必须 1：扫码 QR 标识存 worker 内存，多 worker 会拿不到登录成功事件
+
+[credential]
+enabled = true     # 扫码后凭据写入 sqlite、调用自动复用（本项目核心依赖此项）
+
+[security]
+rate_limit_enabled = false   # 本地 server-to-server 调用，关掉限流
+```
+
+> 不接 QQ 音乐也能跑，会自动降级到网易云兜底（覆盖率约 70-80%）。
+
+### 3. 配置凭证
 
 复制配置模板并填入你自己的 key：
 
@@ -62,11 +87,11 @@ copy ai-radio\data\config.example.json ai-radio\data\config.json
 
 各字段获取方式见下方「配置说明」。`data/config.json` 已在 `.gitignore`，不会入仓。
 
-### 3. 启动
+### 4. 启动
 
 双击根目录 **`点我启动电台.bat`** —— 自动拉起后端 `:8000` + QQ 音乐服务 `:8080`，并打开浏览器。
 
-### 4. 登录 QQ 音乐
+### 5. 登录 QQ 音乐
 
 打开 `/qq-login.html`，用**手机 QQ 扫码**。凭据由 `:8080` 的 SQLite 全权管理并自动续期，几乎永久有效（除非腾讯主动踢账号才需重扫）。
 
