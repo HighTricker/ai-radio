@@ -1,0 +1,21 @@
+{
+  "_comment": "配置模板：复制本文件为 data/config.json 再填入真实凭证。data/config.json 已在 .gitignore，不会被 git 跟踪。各字段获取方式见项目根 README.md。【QQ 音乐无需在此填 cookie】——启动后打开 /qq-login.html 手机扫码即可，凭据由 :8080 服务的 SQLite 自动管理与续期。",
+  "credentials": {
+    "fish_audio_api_key": "<fish_audio_api_key：https://fish.audio 控制台获取，用于 AI 主播 TTS 合成>",
+    "voice_id": "<默认音色 reference_id：在 fish.audio 选好音色后复制其 id>",
+    "voice_options": [
+      { "id": "<voice_id_1>", "name": "音色 1 自定义显示名" },
+      { "id": "<voice_id_2>", "name": "音色 2 自定义显示名" }
+    ],
+    "mimo_api_key": "<可选：小米 MiMo 大模型 key；与 deepseek 二选一即可>",
+    "deepseek_api_key": "<DeepSeek 大模型 key：https://platform.deepseek.com，用于主播写稿>",
+    "qweather_api_key": "<和风天气 key：https://dev.qweather.com，用于天气感知文案>",
+    "qweather_api_host": "<your_host>.re.qweatherapi.com（和风开发者控制台分配的专属 API Host）",
+    "netease_music_u_cookie": "<可选：网易云 MUSIC_U cookie；作为 QQ 音乐取不到时的兜底音源>"
+  },
+  "settings": {
+    "location_override": null,
+    "llm_provider": "deepseek",
+    "llm_model": "deepseek-v4-pro"
+  }
+}

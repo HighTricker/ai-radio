@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demo · 卡拉 OK 三行</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont/lxgwwenkai-regular.css">
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --text: #e0d4b8;
+      --text-soft: #8a7d63;
+      --text-fade: #4d4538;
+      --accent: #ffb700;
+      --accent-bright: #ffd866;
+      --line: rgba(224, 212, 184, 0.12);
+      --font: 'JetBrains Mono', 'IBM Plex Mono', 'LXGW WenKai', monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.7;
+      font-size: 14px;
+      overflow: hidden;
+    }
+    body::after {
+      content: "";
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(0deg,
+        rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+        rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px);
+      pointer-events: none;
+      z-index: 200;
+      opacity: 0.35;
+    }
+    .demo-nav {
+      position: fixed; top: 1rem; left: 50%; transform: translateX(-50%);
+      display: flex;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      z-index: 100;
+      font-size: 11px;
+    }
+    .demo-nav a {
+      padding: 0.4rem 0.9rem;
+      color: var(--text-soft);
+      text-decoration: none;
+      border-right: 1px solid var(--line);
+      letter-spacing: 0.05em;
+    }
+    .demo-nav a:last-child { border-right: none; }
+    .demo-nav a:hover { color: var(--text); background: rgba(255, 183, 0, 0.06); }
+    .demo-nav a.active { background: var(--accent); color: var(--bg); }
+
+    .stage {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 4.5rem 2rem 1.5rem;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .env-line {
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 0.55rem 0.4rem;
+      font-size: 12px;
+      color: var(--text-soft);
+      display: flex;
+      justify-content: space-between;
+      letter-spacing: 0.06em;
+      margin-bottom: 1.5rem;
+    }
+    .env-line .right { color: var(--accent); }
+
+    .info-row { font-size: 13px; margin-bottom: 0.3rem; letter-spacing: 0.05em; }
+    .info-row .key { color: var(--text-soft); letter-spacing: 0.25em; }
+    .info-row .sep { color: var(--text-fade); }
+    .info-block { margin-bottom: 2.5rem; }
+
+    /* === 卡拉 OK 三行 === */
+    .kara {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 1.2rem;
+      text-align: center;
+      padding: 1rem 0;
+    }
+    .kara-row {
+      transition: all 0.5s ease;
+      letter-spacing: 0.05em;
+      line-height: 1.4;
+    }
+    .kara-prev {
+      font-size: 16px;
+      color: var(--text-fade);
+      opacity: 0.5;
+    }
+    .kara-current {
+      font-size: 32px;
+      color: var(--text);
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      line-height: 1.3;
+      text-shadow: 0 0 28px rgba(255, 183, 0, 0.18);
+    }
+    .kara-current.is-narration {
+      color: var(--accent-bright);
+      font-style: italic;
+    }
+    .kara-current.is-narration::after {
+      content: "█";
+      animation: blink 1s steps(2) infinite;
+      color: var(--accent);
+      margin-left: 5px;
+      font-size: 22px;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    .kara-next {
+      font-size: 16px;
+      color: var(--text-fade);
+      opacity: 0.5;
+    }
+
+    .transport {
+      border-top: 1px solid var(--line);
+      padding-top: 0.9rem;
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+    .ctrl {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 0.35rem 0.85rem;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .ctrl.play {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+    }
+    .ctrl.play svg { fill: currentColor; display: block; }
+    .progress {
+      flex: 1; display: flex; align-items: center; gap: 0.6rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-bar {
+      flex: 1; height: 3px;
+      background: rgba(224, 212, 184, 0.12);
+      position: relative;
+    }
+    .progress-fill {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      background: var(--accent);
+      width: 42%;
+      box-shadow: 0 0 6px rgba(255, 183, 0, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-nav">
+    <a href="lyric-focus.html">居中聚焦</a>
+    <a href="lyric-karaoke.html" class="active">卡拉OK三行</a>
+    <a href="lyric-single.html">单行聚光</a>
+    <a href="lyric-teletype.html">逐字打字</a>
+    <a href="/">原版</a>
+  </div>
+
+  <main class="stage">
+    <div class="env-line">
+      <span>[ 北京 · 朝阳 ] · ☀ 22°C 晴</span>
+      <span class="right">● 12:43 现场</span>
+    </div>
+    <div class="info-block">
+      <div class="info-row"><span class="key">曲目</span> <span class="sep">:</span> 晴天</div>
+      <div class="info-row"><span class="key">歌手</span> <span class="sep">:</span> 周杰伦</div>
+      <div class="info-row"><span class="key">模式</span> <span class="sep">:</span> 歌曲介绍</div>
+    </div>
+
+    <div class="kara">
+      <div class="kara-row kara-prev" id="karaPrev"></div>
+      <div class="kara-row kara-current" id="karaCurrent"></div>
+      <div class="kara-row kara-next" id="karaNext"></div>
+    </div>
+
+    <footer class="transport">
+      <button class="ctrl">[ &lt;&lt; ]</button>
+      <button class="ctrl play">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg>
+      </button>
+      <button class="ctrl">[ &gt;&gt; ]</button>
+      <div class="progress">
+        <span>03:21</span>
+        <div class="progress-bar"><div class="progress-fill"></div></div>
+        <span>04:58</span>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    const stream = [
+      { type: 'narration', text: '天空忽然就晴了。' },
+      { type: 'narration', text: '这是周杰伦的《晴天》。' },
+      { type: 'narration', text: '写给少年时的喜欢。' },
+      { type: 'narration', text: '钢琴前奏轻轻落下，像雨刚停。' },
+      { type: 'lyric', text: '故事的小黄花' },
+      { type: 'lyric', text: '从出生那年就飘着' },
+      { type: 'lyric', text: '童年的荡秋千' },
+      { type: 'lyric', text: '随记忆一直晃到现在' },
+      { type: 'lyric', text: '吹着前奏望着天空' },
+      { type: 'lyric', text: '我想起花瓣试着掉落' },
+      { type: 'lyric', text: '雨过天晴的窗台上' },
+      { type: 'lyric', text: '把回忆拍成了照片' },
+    ];
+
+    const prevEl = document.getElementById('karaPrev');
+    const curEl = document.getElementById('karaCurrent');
+    const nextEl = document.getElementById('karaNext');
+    let idx = 0;
+
+    function render() {
+      const prev = stream[idx - 1];
+      const cur = stream[idx];
+      const next = stream[idx + 1];
+      prevEl.textContent = prev ? prev.text : '';
+      curEl.textContent = cur.text;
+      curEl.classList.toggle('is-narration', cur.type === 'narration');
+      nextEl.textContent = next ? next.text : '';
+    }
+
+    render();
+    setInterval(() => {
+      idx = (idx + 1) % stream.length;
+      render();
+    }, 2500);
+  </script>
+</body>
+</html>

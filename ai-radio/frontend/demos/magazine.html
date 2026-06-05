@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demo · 杂志双栏</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont/lxgwwenkai-regular.css">
+  <style>
+    :root {
+      --bg: #fbfaf7;
+      --text: #1a1a1a;
+      --text-soft: #5a554d;
+      --text-fade: #a09a8e;
+      --line: rgba(26, 26, 26, 0.14);
+      --line-strong: rgba(26, 26, 26, 0.3);
+      --accent: #b32626;
+      --font-cn: 'LXGW WenKai', "Source Han Serif SC", "Songti SC", serif;
+      --font-en: 'Caslon', 'Source Serif Pro', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-cn);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.7;
+    }
+
+    .demo-nav {
+      position: fixed; top: 1.2rem; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 0.3rem;
+      padding: 0.3rem 0.4rem;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      z-index: 100;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+    .demo-nav a {
+      padding: 0.3rem 0.8rem;
+      color: var(--text-soft);
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .demo-nav a:hover { color: var(--text); }
+    .demo-nav a.active { background: var(--text); color: var(--bg); }
+
+    .stage {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 5.5rem 2.5rem 8rem;
+    }
+
+    /* 杂志刊头 */
+    .masthead {
+      text-align: center;
+      padding-bottom: 1.6rem;
+      border-bottom: 2px double var(--line-strong);
+      margin-bottom: 0.4rem;
+    }
+    .masthead .pub {
+      font-family: var(--font-en);
+      font-size: 11px;
+      letter-spacing: 0.45em;
+      color: var(--text-soft);
+      margin: 0 0 0.6rem;
+      text-transform: uppercase;
+    }
+    .masthead .title {
+      font-family: var(--font-en);
+      font-size: 56px;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      margin: 0;
+      font-style: italic;
+      font-weight: 400;
+    }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-fade);
+      letter-spacing: 0.15em;
+      padding: 0.5rem 0 1.2rem;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 2.5rem;
+      text-transform: uppercase;
+    }
+    .meta-row .accent { color: var(--accent); font-weight: 600; }
+
+    /* 大字 lead 段落 */
+    .lead {
+      text-align: center;
+      font-size: 22px;
+      line-height: 1.5;
+      letter-spacing: 0.04em;
+      font-style: italic;
+      color: var(--text);
+      max-width: 720px;
+      margin: 0 auto 3.5rem;
+      font-family: var(--font-en), var(--font-cn);
+    }
+    .lead-attr {
+      display: block;
+      font-size: 12px;
+      letter-spacing: 0.3em;
+      color: var(--text-fade);
+      margin-top: 1rem;
+      font-style: normal;
+      font-family: var(--font-cn);
+    }
+
+    /* 双栏：左旁白 / 右歌词 */
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      gap: 2.5rem;
+    }
+    .col-divider {
+      background: var(--line);
+      width: 1px;
+    }
+    .col h3 {
+      font-family: var(--font-en);
+      font-size: 11px;
+      letter-spacing: 0.32em;
+      color: var(--accent);
+      margin: 0 0 1.2rem;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    /* 旁白：散文体 */
+    .narration {
+      font-size: 16px;
+      line-height: 1.95;
+      letter-spacing: 0.02em;
+    }
+    .narration p { margin: 0 0 0.9rem; }
+    .narration .seg { transition: all 0.4s; color: var(--text-soft); opacity: 0.5; }
+    .narration .seg.past { opacity: 0.32; }
+    .narration .seg.active {
+      opacity: 1;
+      color: var(--text);
+    }
+    .narration .seg.active::before {
+      content: "❝";
+      color: var(--accent);
+      font-family: var(--font-en);
+      font-size: 22px;
+      margin-right: 4px;
+      vertical-align: -3px;
+    }
+    .narration .drop-cap {
+      float: left;
+      font-family: var(--font-en);
+      font-size: 56px;
+      line-height: 0.85;
+      padding: 6px 8px 0 0;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* 歌词：诗体 */
+    .lyrics {
+      font-size: 16px;
+      line-height: 2.05;
+      letter-spacing: 0.04em;
+    }
+    .lyrics .ly { transition: all 0.4s; color: var(--text-soft); opacity: 0.5; }
+    .lyrics .ly.past { opacity: 0.3; }
+    .lyrics .ly.active {
+      opacity: 1;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .lyrics .ly.active::before {
+      content: "—— ";
+      color: var(--accent);
+    }
+
+    /* 底部 transport：报纸 byline 风 */
+    .transport {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: var(--bg);
+      border-top: 1px solid var(--line-strong);
+      padding: 1rem 2.5rem;
+      z-index: 50;
+    }
+    .transport-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-family: var(--font-en);
+    }
+    .ctrl {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      padding: 0.3rem 0.4rem;
+      font-family: var(--font-en);
+      font-size: 15px;
+      letter-spacing: 0.05em;
+      transition: color 0.15s;
+    }
+    .ctrl:hover { color: var(--accent); }
+    .ctrl.play { font-size: 19px; font-weight: 700; }
+
+    .progress {
+      flex: 1; display: flex; align-items: center; gap: 0.8rem;
+      font-size: 11px;
+      color: var(--text-fade);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.08em;
+    }
+    .progress-bar {
+      flex: 1; height: 1px;
+      background: var(--line);
+      position: relative;
+    }
+    .progress-fill {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      background: var(--accent);
+      width: 42%;
+    }
+
+    @media (max-width: 720px) {
+      .columns { grid-template-columns: 1fr; gap: 2rem; }
+      .col-divider { display: none; }
+      .masthead .title { font-size: 36px; }
+      .lead { font-size: 17px; }
+      .stage { padding: 5rem 1.4rem 7rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-nav">
+    <a href="paper-scroll.html">留白纸页</a>
+    <a href="typewriter.html">终端打字机</a>
+    <a href="magazine.html" class="active">杂志双栏</a>
+    <a href="spotlight.html">卡拉OK</a>
+    <a href="/">原版</a>
+  </div>
+
+  <main class="stage">
+    <header class="masthead">
+      <p class="pub">Claudio &nbsp;·&nbsp; Episode No. 23</p>
+      <h1 class="title">晴 天</h1>
+    </header>
+
+    <div class="meta-row">
+      <span>BY <span class="accent">周 杰 伦</span></span>
+      <span>叶惠美 · 2003</span>
+      <span>12:43 · 北京</span>
+    </div>
+
+    <p class="lead">
+      "雨过天晴的窗台上，把回忆拍成了照片。"
+      <span class="lead-attr">—— 选自《晴天》主歌</span>
+    </p>
+
+    <div class="columns">
+      <div class="col">
+        <h3>Narration · 主播旁白</h3>
+        <div class="narration">
+          <span class="drop-cap">天</span><span class="seg past">空忽然就晴了。</span>
+          <span class="seg active">这是周杰伦的《晴天》，写给少年时的喜欢。</span>
+          <span class="seg">钢琴前奏轻轻落下，像雨刚停。前奏不长，但已经够你把心准备好。</span>
+        </div>
+      </div>
+      <div class="col-divider"></div>
+      <div class="col">
+        <h3>Lyrics · 歌词</h3>
+        <div class="lyrics">
+          <div class="ly past">故事的小黄花</div>
+          <div class="ly past">从出生那年就飘着</div>
+          <div class="ly active">童年的荡秋千</div>
+          <div class="ly">随记忆一直晃到现在</div>
+          <div class="ly">吹着前奏望着天空</div>
+          <div class="ly">我想起花瓣试着掉落</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="transport">
+    <div class="transport-inner">
+      <button class="ctrl">◁ PREV</button>
+      <button class="ctrl play">PAUSE</button>
+      <button class="ctrl">NEXT ▷</button>
+      <div class="progress">
+        <span>03:21</span>
+        <div class="progress-bar"><div class="progress-fill"></div></div>
+        <span>04:58</span>
+      </div>
+      <button class="ctrl">SETTINGS</button>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,2515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 电台</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont/lxgwwenkai-regular.css">
+  <style>
+    :root {
+      /* 光斑漂移色板（深紫底 + 琥珀 accent） */
+      --bg-page: #0a0a14;
+      --bg-hero-from: #0a0a14;
+      --bg-hero-to: #0a0a14;
+      --text-primary: #f3eee7;
+      --text-secondary: rgba(243, 238, 231, 0.6);
+      --text-fade: rgba(243, 238, 231, 0.38);
+      --text-on-dark: #f3eee7;
+      --text-on-dark-muted: rgba(243, 238, 231, 0.65);
+      --text-on-dark-fade: rgba(243, 238, 231, 0.4);
+      --accent: #ffd866;
+      --accent-bright: #ffe890;
+      --accent-link: #ffd866;
+      --button-bg: rgba(255, 255, 255, 0.06);
+      --button-text: #f3eee7;
+      --border: rgba(255, 255, 255, 0.08);
+      --karaoke-active: #f3eee7;
+      --karaoke-inactive: rgba(243, 238, 231, 0.38);
+      --karaoke-active-dark: #ffd866;
+      --karaoke-inactive-dark: rgba(243, 238, 231, 0.38);
+      --error: #ff6b6b;
+      --radius-sm: 6px;
+      --radius-lg: 12px;
+      --font-stack: 'JetBrains Mono', 'IBM Plex Mono', 'Cascadia Mono', 'Consolas', 'Menlo', 'LXGW WenKai', monospace;
+    }
+
+    @property --karaoke-pct {
+      syntax: '<percentage>';
+      inherits: false;
+      initial-value: 0%;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-stack);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.7;
+      font-size: 14px;
+      padding: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    /* 不再使用 CRT 扫描线 */
+    body::after { content: none !important; }
+
+    /* === 漂浮光斑背景（3 个独立彩色光斑慢慢漂移） === */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(70px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.7;
+    }
+    .orb-1 {
+      width: 560px; height: 560px;
+      background: radial-gradient(circle, #c084fc 0%, transparent 70%);
+      animation: drift1 22s ease-in-out infinite alternate;
+    }
+    .orb-2 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, #f472b6 0%, transparent 70%);
+      animation: drift2 28s ease-in-out infinite alternate;
+    }
+    .orb-3 {
+      width: 460px; height: 460px;
+      background: radial-gradient(circle, #fbbf24 0%, transparent 70%);
+      animation: drift3 25s ease-in-out infinite alternate;
+    }
+    @keyframes drift1 {
+      0% { transform: translate(-30vw, -30vh); }
+      100% { transform: translate(40vw, 35vh); }
+    }
+    @keyframes drift2 {
+      0% { transform: translate(35vw, -20vh); }
+      100% { transform: translate(-25vw, 30vh); }
+    }
+    @keyframes drift3 {
+      0% { transform: translate(0vw, 30vh); }
+      100% { transform: translate(20vw, -25vh); }
+    }
+
+    /* === 主卡片（stage 现在是卡片本身） === */
+    .stage {
+      position: relative;
+      z-index: 10;
+      width: min(94vw, 720px);
+      min-height: min(90vh, 760px);
+      max-height: 95vh;
+      padding: 2.2rem 2rem 1.4rem;
+      background: rgba(10, 10, 20, 0.55);
+      backdrop-filter: blur(34px) saturate(180%);
+      -webkit-backdrop-filter: blur(34px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 32px;
+      box-shadow:
+        0 36px 110px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .stage { position: relative; z-index: 1; }
+
+    /* === 鼠标萤火虫粒子（移植自个人网站 archive-V5V6-hero/MouseFireflies.tsx） ===
+       全屏 fixed canvas + pointer-events:none 不挡操作；z-index 50 飘在卡片之上但被 modal(200) 压住 */
+    .cursor-fireflies {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 50;
+      pointer-events: none;
+    }
+    /* Toast（status / error 浮动提示） */
+    .toast-stack {
+      position: fixed;
+      left: 50%;
+      bottom: calc(96px + 18px + 0.8rem); /* bar 高度 + bar 距底 + 间距 */
+      transform: translateX(-50%);
+      z-index: 95;
+      display: flex; flex-direction: column;
+      gap: 0.4rem;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      background: rgba(0, 0, 0, 0.72);
+      color: rgba(255, 255, 255, 0.95);
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+      animation: toast-in 0.22s ease;
+      max-width: min(80vw, 460px);
+      text-align: center;
+    }
+    .toast.error {
+      background: rgba(196, 75, 75, 0.92);
+      white-space: pre-wrap;
+      text-align: left;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes toast-out {
+      to { opacity: 0; transform: translateY(8px); }
+    }
+    .toast.leaving { animation: toast-out 0.18s ease forwards; }
+
+    /* 给底部 bar 留出空间，氛围/萤火虫穿透展示 */
+    body { padding-bottom: 0; align-items: stretch; }
+
+    /* === 歌词面板（点击海报弹出，玻璃浮层） === */
+    .lyric-sheet {
+      position: fixed;
+      left: 50%;
+      bottom: calc(96px + 18px + 12px); /* bar 高 + bar 距底 + 间距 */
+      transform: translateX(-50%) translateY(24px);
+      width: calc(100% - 32px);
+      max-width: 920px;
+      height: min(60vh, 560px);
+      z-index: 85;
+      display: flex;
+      flex-direction: column;
+      background:
+        linear-gradient(180deg,
+          rgba(255, 255, 255, 0.78) 0%,
+          rgba(255, 255, 255, 0.6) 100%);
+      backdrop-filter: blur(32px) saturate(180%);
+      -webkit-backdrop-filter: blur(32px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 28px;
+      box-shadow:
+        0 20px 60px rgba(20, 18, 38, 0.22),
+        0 4px 12px rgba(20, 18, 38, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.32s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+      overflow: hidden;
+    }
+    .lyric-sheet.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) translateY(0);
+    }
+    .lyric-sheet-header {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      padding: 0.7rem 1.2rem 0.4rem;
+      flex-shrink: 0;
+    }
+    .lyric-sheet-handle {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.18);
+    }
+    .lyric-sheet-close {
+      position: absolute;
+      top: 0.45rem;
+      right: 0.7rem;
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-secondary);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+      font-family: var(--font-stack);
+    }
+    .lyric-sheet-close:hover { background: rgba(0, 0, 0, 0.06); }
+    .lyric-sheet-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.2rem 1.6rem 1.5rem;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+      position: relative; /* 让子元素 offsetTop 相对 content */
+    }
+    .lyric-sheet-content::-webkit-scrollbar { width: 6px; }
+    .lyric-sheet-content::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.14);
+      border-radius: 3px;
+    }
+    .lyric-empty {
+      text-align: center;
+      color: var(--text-fade);
+      padding: 2.5rem 0;
+      font-size: 13px;
+    }
+    .lyric-narration-wrap {
+      padding: 0.6rem 0 1rem;
+      text-align: center;
+    }
+    .lyric-narration {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      font-size: 15px;
+      line-height: 1.85;
+      letter-spacing: 0.02em;
+      text-align: center;
+    }
+    .lyric-narration-line {
+      color: var(--text-secondary);
+      opacity: 0.5;
+      transition: opacity 0.35s, color 0.35s, font-size 0.35s, font-weight 0.3s;
+    }
+    .lyric-narration-line.past { opacity: 0.3; }
+    .lyric-narration-line.active {
+      opacity: 1;
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 17px;
+    }
+    .lyric-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      padding-bottom: 40%; /* 底部留白，最后一句也能滚到中部 */
+      text-align: center;
+    }
+    .lyric-line {
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      opacity: 0.55;
+      transition: opacity 0.3s, color 0.3s, font-size 0.3s;
+      letter-spacing: 0.01em;
+      text-align: center;
+    }
+    .lyric-line.past { opacity: 0.32; }
+    .lyric-line.active {
+      opacity: 1;
+      color: var(--text-primary);
+      font-weight: 600;
+      font-size: 18px;
+    }
+    /* 元信息行（作词作曲等）：常驻淡灰小字，不参与高亮 */
+    .lyric-line.meta {
+      font-size: 12px;
+      color: var(--text-fade);
+      opacity: 0.5;
+      font-weight: normal;
+      letter-spacing: 0.04em;
+    }
+    /* 海报作为可点击入口 */
+    .pb-poster {
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .pb-poster:hover { transform: scale(1.04); }
+    .pb-poster:active { transform: scale(0.96); }
+    @media (max-width: 720px) {
+      .lyric-sheet {
+        bottom: calc(80px + 12px + 8px);
+        width: calc(100% - 16px);
+        height: min(58vh, 480px);
+        border-radius: 22px;
+      }
+      .lyric-narration { font-size: 14px; }
+      .lyric-line { font-size: 15px; }
+      .lyric-line.active { font-size: 17px; }
+    }
+
+    /* === 配置页（覆盖层 modal） === */
+    .settings-trigger {
+      position: fixed;
+      bottom: 1.6rem;
+      right: 1.6rem;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--button-bg);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transition: transform 0.2s, opacity 0.2s;
+      z-index: 100;
+      font-family: var(--font-stack);
+    }
+    .settings-trigger:hover { transform: rotate(30deg); opacity: 0.9; }
+    .settings-trigger:active { transform: rotate(60deg) scale(0.95); }
+
+    .config-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(27, 25, 56, 0.5);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      animation: configFadeIn 0.18s ease;
+    }
+    @keyframes configFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .config-modal {
+      background: var(--bg-page);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 540px;
+      max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+    }
+    .config-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.2rem 1.4rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg-page);
+      z-index: 1;
+    }
+    .config-header h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+    }
+    #configRequiredHint {
+      font-size: 12px;
+      color: var(--error);
+      font-weight: 500;
+      margin-left: 0.6rem;
+    }
+    .config-close {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 18px;
+      padding: 0.3rem 0.6rem;
+      cursor: pointer;
+      font-family: var(--font-stack);
+    }
+    .config-close:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .config-section {
+      padding: 1.2rem 1.4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .config-section:last-child { border-bottom: none; }
+    .config-section h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 0.3rem;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .config-required, .config-optional {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 0.1rem 0.5rem;
+      border-radius: 6px;
+    }
+    .config-required {
+      color: var(--error);
+      background: rgba(196, 75, 75, 0.08);
+    }
+    .config-optional {
+      color: var(--text-fade);
+      background: rgba(168, 158, 150, 0.12);
+    }
+    .config-hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin: 0 0 0.8rem;
+      line-height: 1.5;
+    }
+    .config-field { margin-bottom: 0.9rem; }
+    .config-field:last-child { margin-bottom: 0; }
+    .config-field label {
+      display: block;
+      font-size: 11px;
+      color: var(--text-fade);
+      margin-bottom: 0.35rem;
+      letter-spacing: 0.04em;
+    }
+    .config-input-row {
+      display: flex;
+      gap: 0.4rem;
+      align-items: stretch;
+    }
+    .config-input {
+      flex: 1;
+      font-family: var(--font-stack);
+      font-size: 13px;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: rgba(0, 0, 0, 0.02);
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.2s;
+      min-width: 0; /* 防止 flex 子元素溢出 */
+    }
+    .config-input:focus { border-color: var(--accent); }
+    .config-input.masked {
+      font-family: monospace;
+      color: var(--text-secondary);
+      background: rgba(0, 0, 0, 0.04);
+    }
+    .config-input::placeholder { color: var(--text-fade); }
+    /* 修复 select 下拉打开后 option 不可见：option 继承 select 的浅色文字 (#f3eee7)
+       落到 Chrome 原生白底上几乎不可见；Chrome 对原生 <option> 仅可控 color/background。 */
+    .config-input option {
+      color: #1a1a1a;
+      background: #fff;
+    }
+    .config-btn {
+      font-size: 12px;
+      padding: 0.45rem 0.8rem;
+      background: var(--button-bg);
+      color: var(--text-primary);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-family: var(--font-stack);
+      font-weight: 500;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+    .config-btn:hover:not(:disabled) { opacity: 0.85; }
+    .config-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .config-btn.primary { background: var(--accent); }
+    .config-test-result {
+      margin-top: 0.5rem;
+      font-size: 12px;
+      min-height: 1em;
+      padding: 0.2rem 0;
+    }
+    .config-test-result.ok { color: #2d8a4a; }
+    .config-test-result.fail { color: var(--error); }
+    .config-test-result.testing { color: var(--text-secondary); }
+
+    @media (max-width: 720px) {
+      .player-bar {
+        bottom: 12px;
+        width: calc(100% - 16px);
+        border-radius: 22px;
+        grid-template-columns: 1fr 1.6fr 1fr;
+        padding: 0.6rem 0.7rem;
+        gap: 0.5rem;
+      }
+      .toast-stack {
+        bottom: calc(80px + 12px + 0.6rem);
+      }
+      .pb-poster { width: 44px; height: 44px; }
+      .pb-title { max-width: 100%; }
+      .pb-artist { display: none; }
+      .pb-feedback { gap: 0.2rem; }
+      .pb-fb-btn { width: 26px; height: 26px; }
+      .pb-ctrl { width: 32px; height: 32px; }
+      .pb-play { width: 38px; height: 38px; }
+      .pb-time { min-width: 32px; font-size: 10px; }
+    }
+    @media (max-width: 520px) {
+      .pb-env { display: none; }
+    }
+    /* ===================================================
+       打字机风专属 CSS（覆盖旧玻璃风）
+       =================================================== */
+
+    /* === 顶部环境信息条（卡片内顶部） === */
+    .env-line {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 0.65rem 0.4rem;
+      margin: 0 0 1.4rem;
+      font-size: 13px;
+      color: var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      letter-spacing: 0.07em;
+    }
+    .env-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--accent);
+    }
+    .env-item.empty { color: var(--text-fade); }
+    .env-sep { color: var(--accent); opacity: 0.5; padding: 0 0.2rem; }
+
+    /* === 歌曲信息区 === */
+    .info-block { margin: 0 0 1.8rem; }
+    .info-row {
+      display: grid;
+      grid-template-columns: 3em 0.6em 1fr;
+      align-items: baseline;
+      margin-bottom: 0.3rem;
+      font-size: 13px;
+      letter-spacing: 0.05em;
+    }
+    .info-key {
+      color: var(--text-secondary);
+      letter-spacing: 0.25em;
+    }
+    .info-sep {
+      color: var(--text-fade);
+      text-align: center;
+    }
+    .info-val {
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* === 反馈按钮行 === */
+    .feedback-row {
+      display: flex;
+      gap: 0.6rem;
+      margin: 0 0 2rem;
+    }
+
+    /* === 通用 ctrl 按钮（卡片内圆角风） === */
+    .ctrl {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      cursor: pointer;
+      padding: 0.4rem 0.8rem;
+      font-family: var(--font-stack);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      border-radius: 8px;
+      transition: all 0.15s;
+    }
+    .ctrl:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .ctrl:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .ctrl.active {
+      background: var(--accent);
+      color: var(--bg-page);
+      border-color: var(--accent);
+    }
+
+    /* === 卡片内歌词流：flex 自适应，从底部进入 === */
+    .stream-flow {
+      flex: 1;
+      min-height: 240px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 0.55rem;
+      padding: 0.8rem 0 0.4rem;
+      margin: 0.5rem 0 0;
+      position: relative;
+      mask-image: linear-gradient(180deg, transparent 0%, #000 22%, #000 100%);
+      -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 22%, #000 100%);
+    }
+    .stream-flow::before { content: none; }
+    /* 让 wrap 不影响 flex 流（子元素直接挂在 stream-flow 下） */
+    .lyric-narration-wrap { display: contents; }
+    .narration { display: contents; }
+    .lyrics { display: contents; }
+
+    /* 共用行样式 */
+    .lyric-narration-line,
+    .lyric-line {
+      display: block;
+      font-size: 16px;
+      line-height: 1.75;
+      color: var(--text-secondary);
+      opacity: 0.45;
+      letter-spacing: 0.04em;
+      padding-left: 1.5rem;
+      position: relative;
+      transition: opacity 0.35s, color 0.35s;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      text-align: left !important;
+      font-weight: normal !important;
+      flex-shrink: 0;
+    }
+    .lyric-narration-line { font-style: italic; }
+    .lyric-narration-line::before {
+      content: "❯";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-style: normal;
+      font-weight: 600;
+    }
+    .lyric-line::before {
+      content: "♪";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-size: 1.05em;
+      top: -1px;
+    }
+    /* 历史行：更淡 */
+    .lyric-narration-line.past,
+    .lyric-line.past { opacity: 0.32; }
+    /* 当前句：高亮 + 末尾闪烁光标 */
+    .lyric-narration-line.active,
+    .lyric-line.active {
+      opacity: 1 !important;
+      color: var(--text-primary) !important;
+      font-size: 16.5px !important;
+    }
+    .lyric-narration-line.active::after,
+    .lyric-line.active::after {
+      content: "█";
+      animation: typewriter-blink 0.9s steps(2) infinite;
+      color: var(--accent);
+      margin-left: 4px;
+      font-size: 13px;
+    }
+    .lyric-line.active::before { content: "♪" !important; position: absolute !important; left: 0 !important; color: var(--accent) !important; font-size: 1.05em !important; top: -1px !important; }
+    @keyframes typewriter-blink {
+      50% { opacity: 0; }
+    }
+
+    /* 元信息行（作词作曲）—— 终端流里不需要，全部隐藏 */
+    .lyric-line.meta { display: none !important; }
+
+    .lyric-empty {
+      color: var(--text-fade);
+      padding: 1rem 0;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+    }
+
+    /* === 卡片底部 transport === */
+    .transport {
+      position: relative;
+      margin-top: 1rem;
+      padding: 0.9rem 0 0;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-stack);
+      flex-shrink: 0;
+    }
+    .transport-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .transport .ctrl.play {
+      background: var(--accent);
+      color: var(--bg-page);
+      border-color: var(--accent);
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      width: 40px;
+      height: 32px;
+      border-radius: 8px;
+      box-shadow: 0 0 12px rgba(255, 216, 102, 0.45);
+    }
+    /* 上一首 / 下一首：图标按钮（白米图标 + 半透明底） */
+    .transport .ctrl-step {
+      width: 40px;
+      height: 32px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border);
+    }
+    .transport .ctrl-step svg { fill: currentColor; display: block; }
+    .transport .ctrl-step:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .transport .ctrl.play svg { display: block; }
+    .transport .ctrl.play:hover:not(:disabled) {
+      background: var(--accent-bright);
+      border-color: var(--accent-bright);
+      color: var(--bg-page);
+    }
+    .transport .progress {
+      flex: 1; display: flex; align-items: center; gap: 0.6rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-bar {
+      flex: 1; height: 14px;
+      position: relative;
+      cursor: pointer;
+      display: flex; align-items: center;
+      touch-action: none;
+    }
+    .progress-bar[data-disabled="true"] {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .progress-track {
+      width: 100%; height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      display: block;
+    }
+    .progress-fill {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.1s linear;
+      box-shadow: 0 0 6px rgba(255, 183, 0, 0.5);
+    }
+    .progress-thumb {
+      position: absolute;
+      top: 50%; left: 0%;
+      width: 10px; height: 10px;
+      background: var(--accent);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    .progress-bar:hover .progress-thumb,
+    .progress-bar.dragging .progress-thumb { opacity: 1; }
+
+    /* === 设置齿轮（卡片底部 transport 末尾） === */
+    .settings-trigger {
+      position: static !important;
+      top: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      left: auto !important;
+      background: var(--accent) !important;
+      border: 1px solid var(--accent) !important;
+      color: var(--bg-page) !important;
+      font-family: var(--font-stack) !important;
+      font-size: 14px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0 !important;
+      padding: 0 !important;
+      border-radius: 50% !important;
+      width: 32px !important;
+      height: 32px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-shadow: 0 0 12px rgba(255, 216, 102, 0.5) !important;
+      transition: transform 0.2s, box-shadow 0.2s !important;
+      z-index: auto !important;
+      transform: none !important;
+      cursor: pointer !important;
+      flex-shrink: 0 !important;
+    }
+    .settings-trigger::before { content: none !important; }
+    .settings-trigger:hover {
+      background: var(--accent-bright) !important;
+      border-color: var(--accent-bright) !important;
+      box-shadow: 0 0 18px rgba(255, 232, 144, 0.7) !important;
+      transform: rotate(60deg) !important;
+      color: var(--bg-page) !important;
+    }
+    .settings-trigger:active {
+      transform: rotate(120deg) scale(0.95) !important;
+    }
+
+    /* === 卡片内状态行（取代浮动 toast） === */
+    .card-status {
+      font-size: 11px;
+      color: var(--accent-bright);
+      letter-spacing: 0.12em;
+      padding: 0.3rem 0;
+      margin-bottom: 0.4rem;
+      min-height: 1.4em;
+      text-align: center;
+      transition: opacity 0.3s;
+      opacity: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .card-status.show { opacity: 1; }
+    .card-status.error {
+      color: #ffb3b3;
+      letter-spacing: 0.05em;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    /* 旧 toast 浮层不再显示（DOM 保留兼容） */
+    .toast-stack { display: none !important; }
+
+    /* === 响应式 === */
+    @media (max-width: 760px) {
+      body { padding: 1rem; }
+      .stage {
+        padding: 1.5rem 1.3rem 1rem;
+        border-radius: 22px;
+        min-height: 75vh;
+      }
+      .env-line { font-size: 11px; padding: 0.5rem 0.3rem; }
+      .info-row { font-size: 12px; }
+      .transport-inner { gap: 0.4rem; }
+      .ctrl { padding: 0.35rem 0.55rem; font-size: 10px; }
+      .lyric-narration-line, .lyric-line { font-size: 14px; }
+      .lyric-narration-line.active, .lyric-line.active { font-size: 15px !important; }
+    }
+
+  </style>
+</head>
+<body>
+  <!-- 光斑漂移背景 -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <canvas class="cursor-fireflies" id="cursorFireflies" aria-hidden="true"></canvas>
+
+  <!-- 主舞台（卡片） -->
+  <main class="stage open" id="lyricSheet" data-lyric-stream>
+    <div class="card-status" id="cardStatus" aria-live="polite"></div>
+    <div class="env-line">
+      <span class="env-item" id="envLocation"><span id="envLocationText">--</span></span>
+      <span class="env-sep" id="envSep1" style="display:none">·</span>
+      <span class="env-item" id="envWeather">
+        <span id="envWeatherIcon"></span><span id="envWeatherText">--</span>
+      </span>
+      <span class="env-sep" id="envSep2" style="display:none">·</span>
+      <span class="env-item right"><span id="envTime">--:--</span></span>
+    </div>
+
+    <div class="info-block">
+      <div class="info-row"><span class="info-key">曲目</span><span class="info-sep">:</span><span class="info-val" id="pbTitle">点击 ▶ 开始</span></div>
+      <div class="info-row"><span class="info-key">歌手</span><span class="info-sep">:</span><span class="info-val" id="pbArtist">--</span></div>
+      <div class="info-row"><span class="info-key">模式</span><span class="info-sep">:</span><span class="info-val" id="pbMode">歌曲介绍</span></div>
+    </div>
+
+    <div class="feedback-row">
+      <button class="ctrl" id="likeBtn" disabled>[ &hearts; 喜欢 ]</button>
+      <button class="ctrl" id="dislikeBtn" disabled>[ &times; 跳过 ]</button>
+    </div>
+
+    <div id="lyricSheetContent" class="stream-flow">
+      <div class="lyric-narration-wrap" id="lyricNarrationWrap" style="display:none">
+        <div class="narration" id="lyricNarration"></div>
+      </div>
+      <div class="lyrics" id="lyricList"></div>
+      <div class="lyric-empty" id="lyricEmpty">// 点击 ▶ 开始</div>
+    </div>
+
+    <!-- 卡片底部 transport -->
+    <footer class="transport">
+      <div class="transport-inner">
+        <button class="ctrl ctrl-step" id="prevBtn" disabled title="上一首" aria-label="上一首">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6h2v12H6zM20 18l-10.5-6L20 6z" fill="currentColor"/></svg>
+        </button>
+        <button class="ctrl play" id="playPauseBtn" title="开始 / 暂停">
+          <svg id="pbIconPlay" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+        </button>
+        <button class="ctrl ctrl-step" id="nextBtn" disabled title="下一首" aria-label="下一首">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 18l10.5-6L6 6zM16 6h2v12h-2z" fill="currentColor"/></svg>
+        </button>
+        <div class="progress">
+          <span id="pbTimeNow">00:00</span>
+          <span class="progress-bar" id="pbProgressBar" data-disabled="true">
+            <span class="progress-track">
+              <span class="progress-fill" id="progressFill"></span>
+            </span>
+            <span class="progress-thumb" id="pbProgressThumb"></span>
+          </span>
+          <span id="pbTimeTotal">00:00</span>
+        </div>
+        <button class="settings-trigger" id="settingsTrigger" title="配置">⚙</button>
+      </div>
+    </footer>
+  </main>
+
+  <!-- 旧 JS 引用兼容（隐藏占位） -->
+  <div id="pbPoster" style="display:none"></div>
+  <button id="lyricSheetClose" style="display:none" aria-hidden="true"></button>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <!-- === 配置覆盖层（modal） === -->
+  <div class="config-overlay" id="configOverlay" style="display:none">
+    <div class="config-modal" id="configModal">
+      <header class="config-header">
+        <h2>配置<span id="configRequiredHint" style="display:none">必填项未完成，无法关闭</span></h2>
+        <button class="config-close" id="configClose" title="关闭">✕</button>
+      </header>
+
+      <section class="config-section">
+        <h3>大模型 API <span class="config-required">必填</span></h3>
+        <p class="config-hint">用于 AI 主播写旁白稿。支持 OpenAI 兼容协议多源切换（当前可选 MiMo / DeepSeek）。当前 provider 对应的 API KEY 必填，其他可选保存以便随时切换。</p>
+        <div class="config-field">
+          <label>当前 PROVIDER / 模型名</label>
+          <div class="config-input-row">
+            <select id="cfg-llm-provider" class="config-input" style="max-width: 140px">
+              <option value="mimo">MiMo（小米）</option>
+              <option value="deepseek">DeepSeek</option>
+            </select>
+            <input type="text" id="cfg-llm-model" placeholder="留空走默认 (mimo-v2-flash)" class="config-input" style="flex:1">
+            <button class="config-btn primary" id="cfg-llm-settings-save">保存</button>
+          </div>
+          <div class="config-test-result" data-result="llm_settings"></div>
+        </div>
+        <div class="config-field">
+          <label>MiMo API KEY</label>
+          <div class="config-input-row">
+            <input type="text" id="cfg-mimo-input" placeholder="sk-..." class="config-input masked" readonly>
+            <button class="config-btn" data-edit="cfg-mimo-input">编辑</button>
+            <button class="config-btn primary" data-save="mimo_api_key" data-test="mimo">保存测试</button>
+          </div>
+          <div class="config-test-result" data-result="mimo"></div>
+        </div>
+        <div class="config-field">
+          <label>DeepSeek API KEY</label>
+          <div class="config-input-row">
+            <input type="text" id="cfg-deepseek-input" placeholder="sk-..." class="config-input masked" readonly>
+            <button class="config-btn" data-edit="cfg-deepseek-input">编辑</button>
+            <button class="config-btn primary" data-save="deepseek_api_key" data-test="deepseek">保存测试</button>
+          </div>
+          <div class="config-test-result" data-result="deepseek"></div>
+        </div>
+      </section>
+
+      <section class="config-section">
+        <h3>音乐服务 API <span class="config-required">必填</span></h3>
+        <p class="config-hint">网易云 MUSIC_U cookie，用于解锁 VIP 完整曲。从浏览器登录态导出，约 6 个月有效。</p>
+        <div class="config-field">
+          <label>MUSIC_U COOKIE</label>
+          <div class="config-input-row">
+            <input type="text" id="cfg-netease-input" placeholder="00E9..." class="config-input masked" readonly>
+            <button class="config-btn" data-edit="cfg-netease-input">编辑</button>
+            <button class="config-btn primary" data-save="netease_music_u_cookie" data-test="netease">保存测试</button>
+          </div>
+          <div class="config-test-result" data-result="netease"></div>
+        </div>
+        <div class="config-field">
+          <label>QQ 音乐登录</label>
+          <div class="config-input-row">
+            <span class="config-input" id="cfg-qq-status" style="display:flex;align-items:center;font-size:13px;color:#6b6b6b;">检查中…</span>
+            <button class="config-btn primary" type="button" id="cfg-qq-login-btn">扫码登录</button>
+          </div>
+          <p class="config-hint" style="margin-top:6px;font-size:12px;line-height:1.5;">点击弹出扫码页，手机 QQ 扫码后凭据由 :8080 sqlite 全权管理 + 自动续期，几乎永久有效（除非腾讯主动踢账号才需重扫）。</p>
+        </div>
+      </section>
+
+      <section class="config-section">
+        <h3>语音 API <span class="config-optional">可选</span></h3>
+        <p class="config-hint">Fish Audio 用于 AI 主播 TTS。不填会跳过旁白只播歌。</p>
+        <div class="config-field">
+          <label>FISH AUDIO KEY</label>
+          <div class="config-input-row">
+            <input type="text" id="cfg-fish-input" placeholder="3bf9..." class="config-input masked" readonly>
+            <button class="config-btn" data-edit="cfg-fish-input">编辑</button>
+            <button class="config-btn primary" data-save="fish_audio_api_key" data-test="fish_audio">保存测试</button>
+          </div>
+          <div class="config-test-result" data-result="fish_audio"></div>
+        </div>
+        <div class="config-field">
+          <label>默认 VOICE ID</label>
+          <div class="config-input-row">
+            <input type="text" id="cfg-voice-input" placeholder="683c..." class="config-input masked" readonly>
+            <button class="config-btn" data-edit="cfg-voice-input">编辑</button>
+            <button class="config-btn primary" data-save="voice_id">保存</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="config-section">
+        <h3>声音</h3>
+        <p class="config-hint">Fish Audio 主播音色（在上面「语音 API」section 配 voice_options 后多选才会出现）。</p>
+        <div class="config-field">
+          <select id="cfg-voice-select" class="config-input"></select>
+        </div>
+      </section>
+
+      <section class="config-section">
+        <h3>文案模式</h3>
+        <p class="config-hint">AI 主播的旁白写作模式（下一首生效）。</p>
+        <div class="config-field">
+          <select id="cfg-mode-select" class="config-input"></select>
+        </div>
+      </section>
+
+      <section class="config-section">
+        <h3>天气 API <span class="config-optional">可选</span></h3>
+        <p class="config-hint">和风天气 (QWeather) 用于顶部信息条显示当前天气。不填只显示地点和时间。<a href="https://dev.qweather.com/" target="_blank" rel="noopener">免费申请</a></p>
+        <div class="config-field">
+          <label>QWEATHER API KEY</label>
+          <div class="config-input-row">
+            <input type="text" id="cfg-qweather-input" placeholder="32 位字符" class="config-input masked" readonly>
+            <button class="config-btn" data-edit="cfg-qweather-input">编辑</button>
+            <button class="config-btn primary" data-save="qweather_api_key" data-test="qweather">保存测试</button>
+          </div>
+          <div class="config-test-result" data-result="qweather"></div>
+        </div>
+      </section>
+
+      <section class="config-section">
+        <h3>位置 <span class="config-optional">可选</span></h3>
+        <p class="config-hint">手动指定位置后绕过浏览器定位（VPN 或 LAN IP 访问时 Chrome 不会弹授权框，<a href="https://web.dev/secure-contexts/" target="_blank" rel="noopener">了解原因</a>）。需要先配上面的「天气 API」才能搜索城市。</p>
+        <div class="config-field">
+          <label>当前位置</label>
+          <div id="locOverrideDisplay" class="config-hint" style="margin: 0 0 0.5rem; font-size: 13px; color: var(--text-primary);">（未设置 · 走浏览器定位 / IP 兜底）</div>
+          <button class="config-btn" id="locClearBtn" disabled>清除</button>
+        </div>
+        <div class="config-field">
+          <label>搜索城市</label>
+          <div class="config-input-row">
+            <input type="text" id="cfg-loc-search" placeholder="如：北京 / 朝阳区 / 上海徐汇" class="config-input">
+            <button class="config-btn primary" id="locSearchBtn">搜索</button>
+          </div>
+          <div class="config-test-result" id="locSearchResult"></div>
+          <div id="locSearchCandidates" style="margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.3rem;"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // === Web Audio 全局 ===
+    let ctx = null;
+    let ttsSource = null;
+    let songSource = null;
+    let songGain = null;
+    let startedAt = 0;
+    let ttsDuration = 0;
+    let totalDuration = 0;
+    let isPaused = false;
+    let rafId = null;
+    let songEnded = false;
+    let narrationEnded = false;
+    let bgVolume = 0.15;
+
+    // === 错误 fallback ===
+    // 连续 N 首播不出来时停止自动跳过，避免歌单整体断网/cookie 失效时无限轮询
+    const MAX_CONSEC_FAILURES = 3;
+    let consecutiveTrackFailures = 0;
+    let autoNextTimer = null;
+
+    let songOffsetSec = 0;
+    let currentSongBuf = null;     // 全局保留歌曲 buffer，给 seek 重建用
+    let isDragging = false;
+
+    const $ = (id) => document.getElementById(id);
+    const progressFill = $('progressFill');
+    const playPauseBtn = $('playPauseBtn');
+    const nextBtn = $('nextBtn');
+    const prevBtn = $('prevBtn');
+    const likeBtn = $('likeBtn');
+    const dislikeBtn = $('dislikeBtn');
+    const pbPoster = $('pbPoster');
+    const pbTitle = $('pbTitle');
+    const pbArtist = $('pbArtist');
+    const pbIconPlay = $('pbIconPlay');
+    const pbTimeNow = $('pbTimeNow');
+    const pbTimeTotal = $('pbTimeTotal');
+    const pbProgressBar = $('pbProgressBar');
+    const pbProgressThumb = $('pbProgressThumb');
+    const toastStack = $('toastStack');
+    const lyricSheet = $('lyricSheet');
+    const lyricSheetClose = $('lyricSheetClose');
+    const lyricSheetContent = $('lyricSheetContent');
+    const lyricEmpty = $('lyricEmpty');
+    const lyricNarrationWrap = $('lyricNarrationWrap');
+    const lyricNarrationEl = $('lyricNarration');
+    const lyricListEl = $('lyricList');
+    let lyricLineEls = [];
+    let lyricMetaFlags = [];
+    let lastActiveLyricIndex = -1;
+    let narrationSegments = [];      // [{ text, charsStart, charsEnd }]
+    let narrationSegmentEls = [];
+    let narrationTotalChars = 0;
+    let lastActiveNarrationIndex = -1;
+    let currentVoiceId = null;
+    let currentMode = 'song_intro';
+    const MODE_LABELS_ZH = {
+      song_intro: '歌曲介绍',
+      classic_prose: '散文',
+      history_today: '今日掌故',
+      quotation: '一句话',
+      weather_mood: '天气感悟',
+    };
+    let currentEpisode = null;
+
+    // SVG path 切换播放/暂停图标
+    const PLAY_PATH = 'M8 5v14l11-7z';
+    const PAUSE_PATH = 'M6 5h4v14H6zM14 5h4v14h-4z';
+    function setPlayIcon(playing) {
+      const path = pbIconPlay && pbIconPlay.querySelector('path');
+      if (path) path.setAttribute('d', playing ? PAUSE_PATH : PLAY_PATH);
+    }
+
+    // === Toast（status / error 浮动提示，替代旧的状态文本和 error div） ===
+    function dismissToast(el) {
+      if (!el || !el.isConnected) return;
+      el.classList.add('leaving');
+      setTimeout(() => { if (el.isConnected) el.remove(); }, 200);
+    }
+    let lastErrorToast = null;
+    const cardStatus = document.getElementById('cardStatus');
+    let cardStatusFadeTimer = null;
+    function setStatus(msg) {
+      if (!cardStatus) return;
+      if (cardStatusFadeTimer) { clearTimeout(cardStatusFadeTimer); cardStatusFadeTimer = null; }
+      cardStatus.classList.remove('error');
+      cardStatus.onclick = null;
+      if (msg) {
+        cardStatus.textContent = msg;
+        cardStatus.classList.add('show');
+      } else {
+        cardStatus.textContent = '';
+        cardStatus.classList.remove('show');
+      }
+    }
+    function showError(msg) {
+      if (!cardStatus) return;
+      if (cardStatusFadeTimer) { clearTimeout(cardStatusFadeTimer); cardStatusFadeTimer = null; }
+      cardStatus.textContent = msg || '';
+      cardStatus.classList.add('show', 'error');
+      cardStatus.onclick = () => clearError();
+    }
+    function clearError() {
+      if (!cardStatus) return;
+      if (cardStatus.classList.contains('error')) {
+        cardStatus.classList.remove('error', 'show');
+        cardStatus.textContent = '';
+        cardStatus.onclick = null;
+      }
+      if (lastErrorToast) { dismissToast(lastErrorToast); lastErrorToast = null; }
+    }
+    function formatTime(sec) {
+      if (!isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    // === LRC 解析 ===
+    function parseLRC(text) {
+      if (!text) return [];
+      const tagRe = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
+      const lines = [];
+      for (const raw of text.split('\n')) {
+        const trimmed = raw.trim();
+        if (!trimmed) continue;
+        const tags = [];
+        let m;
+        tagRe.lastIndex = 0;
+        let lastEnd = 0;
+        while ((m = tagRe.exec(trimmed)) !== null) {
+          const ms = (parseInt(m[1], 10) * 60 + parseFloat(m[2])) * 1000;
+          tags.push(ms);
+          lastEnd = tagRe.lastIndex;
+        }
+        if (tags.length === 0) continue;
+        const txt = trimmed.slice(lastEnd).trim();
+        if (!txt) continue;
+        for (const ms of tags) lines.push({ time_ms: ms, text: txt });
+      }
+      lines.sort((a, b) => a.time_ms - b.time_ms);
+      return lines;
+    }
+
+    function findIntroEndMs(lines) {
+      const metaPrefix = /^(作词|作曲|编曲|出品|制作|演唱|混音|母带|和声|监制|录音)\s*[:：]/;
+      for (const line of lines) {
+        if (line.time_ms < 10000) continue;
+        if (metaPrefix.test(line.text)) continue;
+        return line.time_ms;
+      }
+      return lines[0]?.time_ms || 0;
+    }
+
+    // === 主流程 ===
+    async function fetchEpisode(direction = 'next') {
+      const params = new URLSearchParams();
+      if (direction === 'prev') params.set('direction', 'prev');
+      if (currentVoiceId) params.set('voice', currentVoiceId);
+      if (currentMode) params.set('mode', currentMode);
+      const qs = params.toString();
+      const url = '/api/v1/episode' + (qs ? '?' + qs : '');
+      const res = await fetch(url);
+      if (!res.ok) {
+        let body;
+        try { body = await res.json(); } catch (_) { body = { detail: res.statusText }; }
+        const e = new Error(typeof body.message === 'string' ? body.message : (body.detail || res.statusText));
+        e.body = body; e.status = res.status;
+        throw e;
+      }
+      return res.json();
+    }
+
+    async function loadAudio(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`加载失败：${url}`);
+      const buf = await res.arrayBuffer();
+      return ctx.decodeAudioData(buf);
+    }
+
+    function setMeta(ep) {
+      currentEpisode = ep;
+      pbTitle.textContent = ep.song_title || '';
+      pbArtist.textContent = ep.artist || '--';
+      const pbModeEl = document.getElementById('pbMode');
+      if (pbModeEl) {
+        const m = ep.mode || currentMode || 'song_intro';
+        pbModeEl.textContent = MODE_LABELS_ZH[m] || m;
+      }
+      if (ep.cover_url) {
+        pbPoster.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = ep.cover_url;
+        img.alt = ep.song_title || '';
+        img.onerror = () => { pbPoster.innerHTML = '<span class="placeholder">♪</span>'; };
+        pbPoster.appendChild(img);
+      } else {
+        pbPoster.innerHTML = '<span class="placeholder">♪</span>';
+      }
+      renderLyricSheet(ep);
+    }
+
+    // === 歌词面板：渲染 / 高亮 / 开关 ===
+    // 旁白按换行 / 句末标点拆短句，便于逐句高亮
+    function splitNarration(text) {
+      if (!text) return [];
+      const lines = text.split(/\n+/).map(s => s.trim()).filter(Boolean);
+      const segments = [];
+      for (const line of lines) {
+        if (line.length <= 30) { segments.push(line); continue; }
+        const sub = line.split(/(?<=[。？！…])/).map(s => s.trim()).filter(Boolean);
+        if (sub.length > 1) segments.push(...sub);
+        else segments.push(line);
+      }
+      return segments;
+    }
+    // LRC 元信息行（作词作曲等），不参与卡拉 OK 高亮
+    function isMetaLyricLine(text) {
+      return /^(作词|作曲|编曲|出品|制作|演唱|混音|母带|和声|监制|录音|歌曲|专辑|发行|演奏|原唱|后期|配唱|工程|策划|文案|制作人)\s*[:：]/.test(text || '');
+    }
+    function renderLyricSheet(ep) {
+      lastActiveLyricIndex = -1;
+      lastActiveNarrationIndex = -1;
+      lyricLineEls = [];
+      lyricMetaFlags = [];
+      narrationSegments = [];
+      narrationSegmentEls = [];
+      narrationTotalChars = 0;
+      lyricListEl.innerHTML = '';
+      lyricNarrationEl.innerHTML = '';
+
+      if (!ep) {
+        lyricEmpty.style.display = 'block';
+        lyricEmpty.textContent = '点击 ▶ 开始后，这里会显示旁白与歌词';
+        lyricNarrationWrap.style.display = 'none';
+        return;
+      }
+
+      const hasScript = !!(ep.script && ep.script.trim());
+      if (hasScript) {
+        lyricNarrationWrap.style.display = 'contents';
+        const segs = splitNarration(ep.script);
+        let cursor = 0;
+        for (const seg of segs) {
+          const div = document.createElement('div');
+          div.className = 'lyric-narration-line';
+          div.style.display = 'none';
+          div.textContent = '';
+          lyricNarrationEl.appendChild(div);
+          narrationSegments.push({ text: seg, charsStart: cursor, charsEnd: cursor + seg.length });
+          narrationSegmentEls.push(div);
+          cursor += seg.length;
+        }
+        narrationTotalChars = cursor;
+      } else {
+        lyricNarrationWrap.style.display = 'none';
+      }
+
+      const lines = parseLRC(ep.lyric || '');
+      if (lines.length === 0) {
+        if (!hasScript) {
+          lyricEmpty.style.display = 'block';
+          lyricEmpty.textContent = '本首暂无歌词数据';
+        } else {
+          lyricEmpty.style.display = 'none';
+        }
+        return;
+      }
+
+      lyricEmpty.style.display = 'none';
+      const frag = document.createDocumentFragment();
+      for (const line of lines) {
+        const isMeta = isMetaLyricLine(line.text);
+        const div = document.createElement('div');
+        div.className = 'lyric-line' + (isMeta ? ' meta' : '');
+        div.style.display = 'none';
+        div.textContent = '';
+        frag.appendChild(div);
+        lyricLineEls.push(div);
+        lyricMetaFlags.push(isMeta);
+      }
+      lyricListEl.appendChild(frag);
+      // 重置滚动到顶
+      lyricSheetContent.scrollTop = 0;
+    }
+
+    function updateLyricHighlight() {
+      if (!currentEpisode || !ctx) return;
+
+      const elapsed = ctx.currentTime - startedAt;
+
+      if (narrationSegmentEls.length > 0) {
+        if (!narrationEnded) {
+          const ttsDur = ttsDuration > 0.5 ? ttsDuration : 1;
+          const prog = Math.max(0, Math.min(1,
+            (elapsed - 0.3) / Math.max(0.5, ttsDur - 0.6)));
+          const charIdx = prog * narrationTotalChars;
+          for (let i = 0; i < narrationSegments.length; i++) {
+            const seg = narrationSegments[i];
+            const el = narrationSegmentEls[i];
+            if (charIdx >= seg.charsEnd) {
+              el.style.display = '';
+              el.textContent = seg.text;
+              el.classList.remove('active');
+              el.classList.add('past');
+            } else if (charIdx >= seg.charsStart) {
+              el.style.display = '';
+              const localChars = Math.max(1, Math.floor(charIdx - seg.charsStart));
+              el.textContent = seg.text.substring(0, localChars);
+              el.classList.add('active');
+              el.classList.remove('past');
+            } else {
+              el.style.display = 'none';
+              el.textContent = '';
+              el.classList.remove('active', 'past');
+            }
+          }
+          return;
+        } else {
+          for (let i = 0; i < narrationSegments.length; i++) {
+            const el = narrationSegmentEls[i];
+            el.style.display = '';
+            el.textContent = narrationSegments[i].text;
+            el.classList.remove('active');
+            el.classList.add('past');
+          }
+        }
+      }
+
+      if (lyricLineEls.length === 0 || !narrationEnded) return;
+      const lines = parseLRC(currentEpisode.lyric || '');
+      if (lines.length === 0) return;
+
+      const songCurrentMs = (elapsed + songOffsetSec) * 1000;
+      let activeIdx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lyricMetaFlags[i]) continue;
+        if (lines[i].time_ms <= songCurrentMs) activeIdx = i;
+        else break;
+      }
+
+      for (let i = 0; i < lyricLineEls.length; i++) {
+        const el = lyricLineEls[i];
+        if (lyricMetaFlags[i]) {
+          el.style.display = 'none';
+          continue;
+        }
+        if (i > activeIdx) {
+          el.style.display = 'none';
+          el.classList.remove('active', 'past');
+          el.textContent = '';
+        } else if (i === activeIdx) {
+          el.style.display = '';
+          el.classList.add('active');
+          el.classList.remove('past');
+          let endMs = songCurrentMs + 3000;
+          for (let j = activeIdx + 1; j < lines.length; j++) {
+            if (!lyricMetaFlags[j]) { endMs = lines[j].time_ms; break; }
+          }
+          const startMs = lines[activeIdx].time_ms;
+          const lineDur = endMs - startMs;
+          const lineProg = lineDur > 10 ? Math.min(1, (songCurrentMs - startMs) / lineDur) : 1;
+          const text = lines[i].text;
+          const charCount = Math.max(1, Math.ceil(lineProg * text.length));
+          el.textContent = text.substring(0, charCount);
+        } else {
+          el.style.display = '';
+          el.classList.remove('active');
+          el.classList.add('past');
+          el.textContent = lines[i].text;
+        }
+      }
+    }
+
+    function openLyricSheet() {
+      lyricSheet.classList.add('open');
+      lyricSheet.setAttribute('aria-hidden', 'false');
+      // 立刻同步一次高亮（不等下一帧）
+      lastActiveLyricIndex = -1;
+      lastActiveNarrationIndex = -1;
+      updateLyricHighlight();
+    }
+    function closeLyricSheet() {
+      lyricSheet.classList.remove('open');
+      lyricSheet.setAttribute('aria-hidden', 'true');
+    }
+
+    function scheduleAutoNext(seconds = 3) {
+      if (autoNextTimer) { clearInterval(autoNextTimer); autoNextTimer = null; }
+      let countdown = seconds;
+      setStatus(`${countdown} 秒后自动切下一首…`);
+      autoNextTimer = setInterval(() => {
+        countdown -= 1;
+        if (countdown <= 0) {
+          clearInterval(autoNextTimer); autoNextTimer = null;
+          nextEpisode();
+        } else {
+          setStatus(`${countdown} 秒后自动切下一首…`);
+        }
+      }, 1000);
+    }
+
+    async function startPlayback(direction = 'next') {
+      console.log('[B004-diag] startPlayback called, direction=', direction);
+      clearError();
+      if (autoNextTimer) { clearInterval(autoNextTimer); autoNextTimer = null; }
+      playPauseBtn.disabled = true;
+      setStatus('正在准备节目…');
+
+      try {
+        const ep = await fetchEpisode(direction);
+        console.log('[B004-diag] episode 200, payload:', { song_title: ep.song_title, hasTts: !!ep.tts_url, song_url: ep.song_url, tts_url: ep.tts_url, lyric_len: (ep.lyric||'').length, script_len: (ep.script||'').length });
+        setMeta(ep);
+        console.log('[B004-diag] setMeta done');
+
+        const hasTts = !!ep.tts_url;
+        const degradedStages = (ep.degraded || []).map(d => d.stage);
+        const ttsDegraded = degradedStages.includes('tts');
+
+        setStatus(hasTts ? 'AI 主播准备中…' : '准备播放（无旁白）…');
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        console.log('[B004-diag] AudioContext created, state=', ctx.state);
+
+        let ttsBuf = null;
+        let songBuf;
+        if (hasTts) {
+          [ttsBuf, songBuf] = await Promise.all([
+            loadAudio(ep.tts_url),
+            loadAudio(ep.song_url),
+          ]);
+        } else {
+          songBuf = await loadAudio(ep.song_url);
+        }
+        console.log('[B004-diag] loadAudio done, ttsDur=', ttsBuf ? ttsBuf.duration : 0, 'songDur=', songBuf.duration);
+        const ttsDur = hasTts ? ttsBuf.duration : 0;
+
+        // === DJ 时间对齐：用 LRC 第一句真歌词时间戳跳过前奏 ===
+        const lyrics = parseLRC(ep.lyric || '');
+        const introEndMs = findIntroEndMs(lyrics);
+        const introEndSec = introEndMs / 1000;
+        songOffsetSec = hasTts ? Math.max(0, introEndSec - ttsDur - 1) : 0;
+        currentSongBuf = songBuf;
+        pbTimeNow.textContent = '00:00';
+        pbTimeTotal.textContent = formatTime(songBuf.duration);
+        if (hasTts) {
+          console.log(`[DJ align] 前奏 ${introEndSec.toFixed(1)}s · 旁白 ${ttsDur.toFixed(1)}s → 歌曲跳过 ${songOffsetSec.toFixed(1)}s`);
+        }
+
+        // 旁白链路（仅 hasTts）
+        if (hasTts) {
+          ttsSource = ctx.createBufferSource();
+          ttsSource.buffer = ttsBuf;
+          const ttsGain = ctx.createGain();
+          ttsGain.gain.value = 1.0;
+          ttsSource.connect(ttsGain).connect(ctx.destination);
+        }
+
+        // 歌曲链路（有旁白时低音量起步等渐升，无旁白时直接 100%）
+        songSource = ctx.createBufferSource();
+        songSource.buffer = songBuf;
+        songGain = ctx.createGain();
+        songGain.gain.value = hasTts ? bgVolume : 1.0;
+        songSource.connect(songGain).connect(ctx.destination);
+
+        startedAt = ctx.currentTime;
+        if (hasTts) ttsSource.start(startedAt);
+        songSource.start(startedAt, songOffsetSec);
+        ttsDuration = ttsDur;
+        totalDuration = songBuf.duration;
+        songEnded = false;
+        narrationEnded = !hasTts;
+
+        // 旁白结束 → 歌曲渐升 100%；进度条启用
+        if (hasTts) {
+          ttsSource.onended = () => {
+            if (!ctx || songEnded) return;
+            narrationEnded = true;
+            songGain.gain.setValueAtTime(songGain.gain.value, ctx.currentTime);
+            songGain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + 3);
+            pbProgressBar.dataset.disabled = 'false';
+            setStatus('正在播放…');
+          };
+        } else {
+          // 无旁白：进度条立即启用
+          pbProgressBar.dataset.disabled = 'false';
+        }
+
+        songSource.onended = () => {
+          songEnded = true;
+          setStatus('节目结束');
+          playPauseBtn.disabled = false;
+          nextBtn.disabled = false;
+          stopProgress();
+          progressFill.style.width = '100%';
+          pbProgressThumb.style.left = '100%';
+          setPlayIcon(false);
+          // B002 修复：正常播完自动切下一首（给 2 秒短停顿，电台主播切歌的"喘气感"）
+          scheduleAutoNext(2);
+        };
+
+        if (!hasTts) {
+          setStatus(ttsDegraded ? '仅播放歌曲（旁白合成失败）' : '正在播放…');
+        } else {
+          setStatus('正在播放（旁白 + 背景歌曲）');
+        }
+        playPauseBtn.disabled = false;
+        setPlayIcon(true);
+        nextBtn.disabled = false;
+        prevBtn.disabled = false;
+        likeBtn.disabled = false;
+        dislikeBtn.disabled = false;
+        startProgress();
+        consecutiveTrackFailures = 0;
+
+      } catch (err) {
+        console.error(err);
+        if (err.body && err.body.type === 'track_not_found') {
+          consecutiveTrackFailures += 1;
+          const t = err.body.track || {};
+          const head = `《${t.title || '未知'}》/ ${t.artist || '未知'} 不可播。`;
+          if (consecutiveTrackFailures >= MAX_CONSEC_FAILURES) {
+            showError(
+              `已连续 ${consecutiveTrackFailures} 首未能播出。\n${head}\n${err.body.message || ''}\n` +
+              `请检查网络 / 网易云 cookie / 歌单后手动点「下一首」继续。`
+            );
+            setStatus('已暂停（连续失败）');
+            playPauseBtn.disabled = false;
+            setPlayIcon(false);
+            nextBtn.disabled = false;
+            prevBtn.disabled = false;
+          } else {
+            showError(`${head}\n${err.body.message || ''}\n${err.body.suggestion || ''}`);
+            scheduleAutoNext(3);
+            nextBtn.disabled = false;
+            prevBtn.disabled = false;
+            playPauseBtn.disabled = false;
+            setPlayIcon(false);
+          }
+        } else {
+          // B004 修复：非 track_not_found 错误也要恢复切歌按钮，否则 loadAudio 404 /
+          // fetchEpisode 500 等异常会让 nextBtn/prevBtn 永久 disabled，用户点了完全没响应
+          showError(err.message || String(err));
+          setStatus('启动失败');
+          playPauseBtn.disabled = false;
+          setPlayIcon(false);
+          nextBtn.disabled = false;
+          prevBtn.disabled = false;
+        }
+      }
+    }
+
+    function startProgress() {
+      const tick = () => {
+        if (!ctx || songEnded) return;
+        const elapsed = ctx.currentTime - startedAt;
+        const songCurrent = elapsed + songOffsetSec;
+        const dur = currentSongBuf ? currentSongBuf.duration : 0;
+        const pct = dur > 0 ? Math.min(100, (songCurrent / dur) * 100) : 0;
+        if (!isDragging) {
+          progressFill.style.width = pct + '%';
+          pbProgressThumb.style.left = pct + '%';
+          pbTimeNow.textContent = formatTime(songCurrent);
+        }
+        updateLyricHighlight();
+        rafId = requestAnimationFrame(tick);
+      };
+      tick();
+    }
+
+    function stopProgress() {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+
+    function togglePlayPause() {
+      if (!ctx) return;
+      if (isPaused) {
+        ctx.resume(); isPaused = false;
+        setPlayIcon(true);
+        setStatus('继续播放');
+        startProgress();
+      } else {
+        ctx.suspend(); isPaused = true;
+        setPlayIcon(false);
+        setStatus('已暂停');
+        stopProgress();
+      }
+    }
+
+    // playPauseBtn 既是「开始」也是「暂停/继续」
+    function onPlayPauseClick() {
+      if (!ctx) {
+        startPlayback('next');
+      } else {
+        togglePlayPause();
+      }
+    }
+
+    // === 进度条拖拽（旁白阶段禁用，旁白结束启用） ===
+    function progressRatioFromEvent(e) {
+      const rect = pbProgressBar.getBoundingClientRect();
+      const clientX = e.touches && e.touches[0] ? e.touches[0].clientX
+        : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : e.clientX);
+      const ratio = (clientX - rect.left) / rect.width;
+      return Math.max(0, Math.min(1, ratio));
+    }
+    function applyProgressVisual(ratio) {
+      const dur = currentSongBuf ? currentSongBuf.duration : 0;
+      progressFill.style.width = (ratio * 100) + '%';
+      pbProgressThumb.style.left = (ratio * 100) + '%';
+      pbTimeNow.textContent = formatTime(ratio * dur);
+    }
+    function onProgressDown(e) {
+      if (pbProgressBar.dataset.disabled === 'true') return;
+      if (!currentSongBuf) return;
+      e.preventDefault();
+      isDragging = true;
+      pbProgressBar.classList.add('dragging');
+      applyProgressVisual(progressRatioFromEvent(e));
+    }
+    function onProgressMove(e) {
+      if (!isDragging) return;
+      applyProgressVisual(progressRatioFromEvent(e));
+    }
+    function onProgressUp(e) {
+      if (!isDragging) return;
+      isDragging = false;
+      pbProgressBar.classList.remove('dragging');
+      const r = progressRatioFromEvent(e);
+      if (currentSongBuf) seekSong(r * currentSongBuf.duration);
+    }
+
+    function seekSong(targetSec) {
+      if (!ctx || songEnded) return;
+      if (!narrationEnded) return;  // 旁白阶段不允许跳（UI 已禁用，双保险）
+      if (!currentSongBuf || !songSource) return;
+      targetSec = Math.max(0, Math.min(currentSongBuf.duration - 0.1, targetSec));
+
+      try { songSource.onended = null; songSource.stop(); } catch (_) {}
+      songSource = ctx.createBufferSource();
+      songSource.buffer = currentSongBuf;
+      songSource.connect(songGain).connect(ctx.destination);
+      songSource.start(0, targetSec);
+
+      // 旁白早已结束，重设时间基准（songOffsetSec 改为新起点，startedAt 重置到现在）
+      startedAt = ctx.currentTime;
+      songOffsetSec = targetSec;
+
+      songSource.onended = () => {
+        songEnded = true;
+        setStatus('节目结束');
+        playPauseBtn.disabled = false;
+        nextBtn.disabled = false;
+        stopProgress();
+        progressFill.style.width = '100%';
+        pbProgressThumb.style.left = '100%';
+        setPlayIcon(false);
+        // B002 修复：seek 后正常播完也要自动切下一首
+        scheduleAutoNext(2);
+      };
+    }
+
+    function stopCurrent() {
+      if (autoNextTimer) { clearInterval(autoNextTimer); autoNextTimer = null; }
+      stopProgress();
+      if (ttsSource) {
+        try { ttsSource.onended = null; ttsSource.stop(); } catch (_) {}
+        ttsSource = null;
+      }
+      if (songSource) {
+        try { songSource.onended = null; songSource.stop(); } catch (_) {}
+        songSource = null;
+      }
+      if (ctx) { ctx.close(); ctx = null; }
+      songEnded = false;
+      narrationEnded = false;
+      isPaused = false;
+      songOffsetSec = 0;
+      currentSongBuf = null;
+      progressFill.style.width = '0%';
+      pbProgressThumb.style.left = '0%';
+      pbProgressBar.dataset.disabled = 'true';
+      pbTimeNow.textContent = '00:00';
+      pbTimeTotal.textContent = '00:00';
+      setPlayIcon(false);
+      playPauseBtn.disabled = false;  // 留 ▶ 启动入口
+      nextBtn.disabled = true;
+      prevBtn.disabled = true;
+      likeBtn.disabled = true;
+      dislikeBtn.disabled = true;
+      likeBtn.classList.remove('active');
+      dislikeBtn.classList.remove('active');
+      currentEpisode = null;
+    }
+
+    async function nextEpisode() {
+      stopCurrent();
+      setStatus('切到下一首…');
+      await startPlayback('next');
+    }
+
+    async function prevEpisode() {
+      stopCurrent();
+      setStatus('切到上一首…');
+      await startPlayback('prev');
+    }
+
+    async function sendFeedback(action) {
+      if (!currentEpisode || !currentEpisode.song_id) return;
+      const btn = action === 'like' ? likeBtn : dislikeBtn;
+      try {
+        const res = await fetch('/api/v1/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            song_id: currentEpisode.song_id,
+            title: currentEpisode.song_title || '',
+            artist: currentEpisode.artist || '',
+            action: action,
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        // 视觉反馈：高亮 1.5 秒
+        btn.classList.add('active');
+        setTimeout(() => btn.classList.remove('active'), 1500);
+      } catch (e) {
+        showError('反馈写入失败：' + e.message);
+      }
+    }
+
+    async function loadVoices() {
+      const sel = $('cfg-voice-select');
+      if (!sel) return;
+      try {
+        const res = await fetch('/api/v1/voices');
+        const data = await res.json();
+        const voices = data.voices || [];
+        sel.innerHTML = '';
+        if (voices.length === 0) {
+          const opt = document.createElement('option');
+          opt.disabled = true;
+          opt.selected = true;
+          opt.textContent = '未配置 voice_options，无法选择';
+          sel.appendChild(opt);
+          currentVoiceId = null;
+          return;
+        }
+        currentVoiceId = voices[0].id;
+        voices.forEach((v, i) => {
+          const opt = document.createElement('option');
+          opt.value = v.id;
+          opt.textContent = v.name;
+          if (i === 0) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        sel.onchange = () => { currentVoiceId = sel.value; };
+      } catch (e) {
+        console.error('load voices failed:', e);
+      }
+    }
+
+    async function loadModes() {
+      const sel = $('cfg-mode-select');
+      if (!sel) return;
+      try {
+        const res = await fetch('/api/v1/modes');
+        const data = await res.json();
+        const modes = data.modes || [];
+        sel.innerHTML = '';
+        if (modes.length === 0) return;
+        currentMode = data.default || modes[0].id;
+        modes.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.name;
+          if (m.id === currentMode) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        sel.onchange = () => { currentMode = sel.value; };
+      } catch (e) {
+        console.error('load modes failed:', e);
+      }
+    }
+
+    loadVoices();
+    loadModes();
+
+    // === 顶部环境信息条（V3 #2）===
+    // 流程：先用 IP 兜底版本立刻显示，浏览器 Geolocation 拿到精确坐标后再刷一次。
+    // 时间客户端每 30 秒自更新；天气每 30 分钟刷一次（命中后端缓存通常瞬时）。
+    const envLocation = $('envLocation');
+    const envLocationText = $('envLocationText');
+    const envWeather = $('envWeather');
+    const envWeatherIcon = $('envWeatherIcon');
+    const envWeatherText = $('envWeatherText');
+    const envSep1 = $('envSep1');
+    const envSep2 = $('envSep2');
+    const envTime = $('envTime');
+
+    function weatherEmoji(text) {
+      // 和风返回的是中文 text（如「晴」「多云」「小雨」），按关键字简单映射
+      const t = text || '';
+      if (/雷/.test(t)) return '⛈';
+      if (/雪/.test(t)) return '❄';
+      if (/雨/.test(t)) return '🌧';
+      if (/雾|霾|沙|尘/.test(t)) return '🌫';
+      if (/风/.test(t)) return '💨';
+      if (/晴/.test(t)) return '☀';
+      if (/云|阴/.test(t)) return '☁';
+      return '🌡';
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      envTime.textContent = `${hh}:${mm}`;
+    }
+
+    function applyEnvData(data) {
+      if (!data) return;
+      const loc = data.location || {};
+      const parts = [loc.city, loc.region].filter(p => p && p !== loc.city);
+      const display = [loc.city, ...(parts.length ? [loc.region] : [])].filter(Boolean).join(' · ');
+      if (display) {
+        envLocationText.textContent = display;
+        envLocation.classList.remove('empty');
+        envSep1.style.display = '';
+      } else {
+        envLocation.classList.add('empty');
+        envSep1.style.display = 'none';
+      }
+      if (data.weather && data.weather.text) {
+        envWeatherIcon.textContent = weatherEmoji(data.weather.text);
+        const temp = data.weather.temp;
+        envWeatherText.textContent = temp ? `${data.weather.text} ${temp}°` : data.weather.text;
+        envWeather.classList.remove('empty');
+        envSep2.style.display = '';
+      } else {
+        envWeather.classList.add('empty');
+        envSep2.style.display = 'none';
+      }
+    }
+
+    async function loadEnvironment(coords) {
+      try {
+        const url = coords
+          ? `/api/v1/environment?lat=${coords.lat}&lon=${coords.lon}`
+          : '/api/v1/environment';
+        const res = await fetch(url);
+        const data = await res.json();
+        applyEnvData(data);
+      } catch (e) {
+        console.warn('environment fetch failed:', e);
+      }
+    }
+
+    function tryGeolocation() {
+      // Geolocation 仅在 secure context（HTTPS / localhost / 127.0.0.1）下可用，
+      // 通过 LAN IP 访问时浏览器会静默拒绝，连授权弹窗都不弹
+      if (!('geolocation' in navigator)) {
+        console.info('[env] navigator.geolocation 不可用');
+        return;
+      }
+      if (!window.isSecureContext) {
+        console.warn(
+          `[env] 当前不是 secure context（origin=${location.origin}），浏览器拒绝 Geolocation。` +
+          ` 建议改用 http://localhost:8000/ 或 http://127.0.0.1:8000/ 访问。`
+        );
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          console.info(`[env] geolocation OK: ${pos.coords.latitude}, ${pos.coords.longitude}`);
+          loadEnvironment({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        },
+        (err) => console.info(`[env] geolocation 失败 (code=${err.code}): ${err.message}`),
+        { timeout: 6000, maximumAge: 30 * 60 * 1000 }
+      );
+    }
+
+    updateClock();
+    setInterval(updateClock, 30 * 1000);
+    setInterval(() => loadEnvironment(), 30 * 60 * 1000);
+    // 首次环境拉取移到 loadConfigState 之后——要先知道 location_override 才能决定要不要试浏览器定位
+
+    playPauseBtn.addEventListener('click', onPlayPauseClick);
+    nextBtn.addEventListener('click', nextEpisode);
+    prevBtn.addEventListener('click', prevEpisode);
+    likeBtn.addEventListener('click', () => sendFeedback('like'));
+    dislikeBtn.addEventListener('click', () => sendFeedback('dislike'));
+
+    // 进度条拖拽（鼠标 + 触屏）
+    // 旧弹层逻辑已废弃（打字机风把歌词直接做进主区，不再点海报弹出）
+
+    pbProgressBar.addEventListener('mousedown', onProgressDown);
+    window.addEventListener('mousemove', onProgressMove);
+    window.addEventListener('mouseup', onProgressUp);
+    pbProgressBar.addEventListener('touchstart', onProgressDown, { passive: false });
+    window.addEventListener('touchmove', onProgressMove, { passive: false });
+    window.addEventListener('touchend', onProgressUp);
+    pbProgressBar.addEventListener('touchcancel', onProgressUp);
+
+    // === 配置页 ===
+    const configOverlay = $('configOverlay');
+    const configClose = $('configClose');
+    const configRequiredHint = $('configRequiredHint');
+    const settingsTrigger = $('settingsTrigger');
+    const cfgInputs = {
+      mimo_api_key: $('cfg-mimo-input'),
+      deepseek_api_key: $('cfg-deepseek-input'),
+      netease_music_u_cookie: $('cfg-netease-input'),
+      fish_audio_api_key: $('cfg-fish-input'),
+      voice_id: $('cfg-voice-input'),
+      qweather_api_key: $('cfg-qweather-input'),
+    };
+    const cfgResults = {
+      mimo: document.querySelector('[data-result="mimo"]'),
+      deepseek: document.querySelector('[data-result="deepseek"]'),
+      llm_settings: document.querySelector('[data-result="llm_settings"]'),
+      netease: document.querySelector('[data-result="netease"]'),
+      fish_audio: document.querySelector('[data-result="fish_audio"]'),
+      qweather: document.querySelector('[data-result="qweather"]'),
+    };
+
+    // 各 provider 的默认模型名（前端硬编码与后端 PROVIDERS dict 对齐；切换时刷 placeholder）
+    const LLM_PROVIDER_DEFAULTS = {
+      mimo: 'mimo-v2-flash',
+      deepseek: 'deepseek-chat',
+    };
+
+    async function loadConfigState() {
+      try {
+        const res = await fetch('/api/v1/config');
+        const data = await res.json();
+        const creds = data.credentials || {};
+        Object.entries(cfgInputs).forEach(([key, input]) => {
+          const value = creds[key];
+          input.value = (typeof value === 'string') ? value : '';
+          input.classList.add('masked');
+          input.readOnly = true;
+        });
+        const settings = data.settings || {};
+        // V4.0：LLM provider / 模型名同步
+        const providerSel = $('cfg-llm-provider');
+        const modelInput = $('cfg-llm-model');
+        if (providerSel && modelInput) {
+          const p = settings.llm_provider && LLM_PROVIDER_DEFAULTS[settings.llm_provider]
+            ? settings.llm_provider : 'mimo';
+          providerSel.value = p;
+          modelInput.value = settings.llm_model || '';
+          modelInput.placeholder = `留空走默认 (${LLM_PROVIDER_DEFAULTS[p]})`;
+        }
+        renderLocOverride(settings.location_override);
+        configRequiredHint.style.display = data.all_required_ok ? 'none' : '';
+        configClose.disabled = !data.all_required_ok;
+        return data;
+      } catch (e) {
+        console.error('load config failed:', e);
+        return null;
+      }
+    }
+
+    async function saveSettings(patch) {
+      try {
+        await fetch('/api/v1/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings: patch }),
+        });
+      } catch (e) {
+        console.warn('settings 保存失败：', e);
+      }
+    }
+
+    function setCfgEditMode(input) {
+      input.value = '';
+      input.classList.remove('masked');
+      input.readOnly = false;
+      input.placeholder = '在此输入新值（留空保留旧值）';
+      input.focus();
+    }
+
+    function setCfgResult(service, ok, message, isTesting = false) {
+      const el = cfgResults[service];
+      if (!el) return;
+      el.classList.remove('ok', 'fail', 'testing');
+      if (isTesting) {
+        el.classList.add('testing');
+        el.textContent = '测试中…（首次连通可能 5-10 秒）';
+      } else if (message) {
+        el.classList.add(ok ? 'ok' : 'fail');
+        el.textContent = (ok ? '✓ ' : '✗ ') + message;
+      } else {
+        el.textContent = '';
+      }
+    }
+
+    async function cfgSaveAndTest(saveKey, service) {
+      const input = cfgInputs[saveKey];
+      if (!input) return;
+      const newValue = (input.value || '').trim();
+      if (!newValue || input.readOnly) {
+        if (service) setCfgResult(service, false, '请先点「编辑」并输入新值');
+        return;
+      }
+      try {
+        const res = await fetch('/api/v1/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credentials: { [saveKey]: newValue } }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch (e) {
+        if (service) setCfgResult(service, false, '写入失败：' + e.message);
+        else alert('写入失败：' + e.message);
+        return;
+      }
+      await loadConfigState();
+      if (service) {
+        setCfgResult(service, false, '', true);
+        try {
+          const res = await fetch('/api/v1/config/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ service }),
+          });
+          const data = await res.json();
+          setCfgResult(service, data.ok, data.message);
+        } catch (e) {
+          setCfgResult(service, false, '测试请求失败：' + e.message);
+        }
+      }
+    }
+
+    // === 位置覆盖（V3.1：VPN/LAN IP 下 Geolocation 不可用的兜底） ===
+    const locOverrideDisplay = $('locOverrideDisplay');
+    const locClearBtn = $('locClearBtn');
+    const locSearchInput = $('cfg-loc-search');
+    const locSearchBtn = $('locSearchBtn');
+    const locSearchResult = $('locSearchResult');
+    const locSearchCandidates = $('locSearchCandidates');
+
+    function renderLocOverride(loc) {
+      if (loc && typeof loc === 'object' && loc.city) {
+        const parts = [loc.city, loc.region].filter(Boolean);
+        const lat = typeof loc.lat === 'number' ? loc.lat.toFixed(2) : loc.lat;
+        const lon = typeof loc.lon === 'number' ? loc.lon.toFixed(2) : loc.lon;
+        locOverrideDisplay.textContent = `📍 ${parts.join(' · ')}（${lat}, ${lon}）`;
+        locClearBtn.disabled = false;
+      } else {
+        locOverrideDisplay.textContent = '（未设置 · 走浏览器定位 / IP 兜底）';
+        locClearBtn.disabled = true;
+      }
+    }
+
+    function setLocResult(state, message) {
+      locSearchResult.classList.remove('ok', 'fail', 'testing');
+      if (state) locSearchResult.classList.add(state);
+      locSearchResult.textContent = message || '';
+    }
+
+    async function searchLocation() {
+      const name = (locSearchInput.value || '').trim();
+      locSearchCandidates.innerHTML = '';
+      if (!name) {
+        setLocResult('fail', '请输入城市名');
+        return;
+      }
+      setLocResult('testing', '搜索中…');
+      try {
+        const res = await fetch('/api/v1/config/location/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          setLocResult('fail', data.message || '搜索失败');
+          return;
+        }
+        const results = data.results || [];
+        if (results.length === 0) {
+          setLocResult('fail', '没找到匹配的城市');
+          return;
+        }
+        setLocResult('ok', `找到 ${results.length} 个候选，点击使用`);
+        results.forEach(loc => {
+          const btn = document.createElement('button');
+          btn.className = 'config-btn';
+          btn.style.textAlign = 'left';
+          btn.style.justifyContent = 'flex-start';
+          btn.style.width = '100%';
+          btn.style.whiteSpace = 'normal';
+          const parts = [loc.city, loc.region, loc.country].filter(Boolean);
+          btn.textContent = `📍 ${parts.join(' · ')}（${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}）`;
+          btn.addEventListener('click', () => useLocation(loc));
+          locSearchCandidates.appendChild(btn);
+        });
+      } catch (e) {
+        setLocResult('fail', '请求失败：' + e.message);
+      }
+    }
+
+    async function useLocation(loc) {
+      const payload = {
+        city: loc.city || '',
+        region: loc.region || '',
+        lat: Number(loc.lat),
+        lon: Number(loc.lon),
+      };
+      await saveSettings({ location_override: payload });
+      renderLocOverride(payload);
+      locSearchCandidates.innerHTML = '';
+      locSearchInput.value = '';
+      setLocResult('ok', `已保存：${payload.city}`);
+      // 刷新顶部信息条
+      loadEnvironment();
+    }
+
+    async function clearLocation() {
+      // 后端 _read_location_override 看到非字典就返回 None；写空对象等同清除
+      await saveSettings({ location_override: null });
+      renderLocOverride(null);
+      setLocResult('', '已清除，下次刷新走浏览器定位 / IP 兜底');
+      loadEnvironment();
+    }
+
+    if (locSearchBtn) locSearchBtn.addEventListener('click', searchLocation);
+    if (locSearchInput) {
+      locSearchInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); searchLocation(); }
+      });
+    }
+    if (locClearBtn) locClearBtn.addEventListener('click', clearLocation);
+
+    function openConfig() {
+      configOverlay.style.display = '';
+      loadConfigState();
+      refreshQqLoginStatus();
+    }
+
+    async function refreshQqLoginStatus() {
+      const statusEl = document.getElementById('cfg-qq-status');
+      const btnEl = document.getElementById('cfg-qq-login-btn');
+      if (!statusEl || !btnEl) return;
+      try {
+        const r = await fetch('/api/v1/qq-login/me');
+        const data = await r.json();
+        if (data.logged_in) {
+          statusEl.style.color = '#2f7d3a';
+          statusEl.innerHTML = `✓ 已登录 <span style="margin-left:6px;color:#6b6b6b;font-size:12px;">musicid=${data.musicid}</span>`;
+          btnEl.textContent = '重新扫码';
+        } else {
+          statusEl.style.color = '#b87b00';
+          statusEl.textContent = '✗ 未登录';
+          btnEl.textContent = '扫码登录';
+        }
+      } catch (e) {
+        statusEl.textContent = '状态查询失败';
+      }
+    }
+
+    const cfgQqLoginBtn = document.getElementById('cfg-qq-login-btn');
+    if (cfgQqLoginBtn) {
+      cfgQqLoginBtn.addEventListener('click', () => {
+        // 弹出新窗口；扫码完成后用户关闭窗口回来，下次打开配置面板会自动刷新状态
+        window.open('/qq-login.html', '_blank', 'width=520,height=720');
+      });
+    }
+    function closeConfig() {
+      if (configClose.disabled) return;
+      configOverlay.style.display = 'none';
+    }
+
+    settingsTrigger.addEventListener('click', openConfig);
+    configClose.addEventListener('click', closeConfig);
+    configOverlay.addEventListener('click', (e) => {
+      if (e.target === configOverlay) closeConfig();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && configOverlay.style.display !== 'none') closeConfig();
+    });
+    document.querySelectorAll('[data-edit]').forEach(btn => {
+      const id = btn.dataset.edit;
+      const input = document.getElementById(id);
+      btn.addEventListener('click', () => setCfgEditMode(input));
+    });
+    document.querySelectorAll('[data-save]').forEach(btn => {
+      const saveKey = btn.dataset.save;
+      const service = btn.dataset.test;
+      btn.addEventListener('click', () => cfgSaveAndTest(saveKey, service));
+    });
+
+    // V4.0：LLM provider 切换 → 刷新模型名 placeholder；模型名只是提示，未输入则后端走默认
+    const cfgLlmProvider = $('cfg-llm-provider');
+    const cfgLlmModel = $('cfg-llm-model');
+    if (cfgLlmProvider && cfgLlmModel) {
+      cfgLlmProvider.addEventListener('change', () => {
+        const p = cfgLlmProvider.value;
+        cfgLlmModel.placeholder = `留空走默认 (${LLM_PROVIDER_DEFAULTS[p] || ''})`;
+      });
+    }
+
+    // V4.0：保存 LLM provider + 模型名到 settings（不是 credentials）
+    const cfgLlmSettingsSave = $('cfg-llm-settings-save');
+    if (cfgLlmSettingsSave) {
+      cfgLlmSettingsSave.addEventListener('click', async () => {
+        const provider = cfgLlmProvider.value;
+        const model = (cfgLlmModel.value || '').trim();
+        setCfgResult('llm_settings', false, '', true);
+        try {
+          const res = await fetch('/api/v1/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ settings: { llm_provider: provider, llm_model: model } }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          await loadConfigState();
+          const label = provider === 'deepseek' ? 'DeepSeek' : 'MiMo';
+          const modelShown = model || LLM_PROVIDER_DEFAULTS[provider];
+          setCfgResult('llm_settings', true, `已切到 ${label} / ${modelShown}`);
+        } catch (e) {
+          setCfgResult('llm_settings', false, '保存失败：' + e.message);
+        }
+      });
+    }
+
+    // 首启判定：必填项未填则强制弹出 + 拉环境
+    // 注：氛围动画(ambient)体系在 V3.2/V4.1 已整体移除；此处原有的
+    //     loadAmbientCatalog() 与 applyAmbient(normalizeAmbientMode(s)) 两行是删除时
+    //     遗留的孤儿调用（函数已无定义），会在此抛 ReferenceError 中断整个 then 链，
+    //     导致 loadEnvironment() / tryGeolocation() / 首启强制弹配置都不执行。详见 bug.md B007，已删除。
+    loadConfigState().then(async (data) => {
+      if (!data) return;
+      const s = data.settings || {};
+
+      // 拉一次环境（后端会按 settings.location_override → IP 兜底优先级处理）
+      await loadEnvironment();
+
+      // 没设手动位置时，再尝试浏览器精确定位覆盖 IP 兜底
+      // 设了 override 就不调——一来用户已经指定了准确位置，二来 LAN IP 下 Chrome 不会弹授权
+      if (!s.location_override) {
+        tryGeolocation();
+      }
+
+      if (!data.all_required_ok) openConfig();
+    });
+
+    // === 鼠标萤火虫粒子（移植自个人网站 archive-V5V6-hero/MouseFireflies.tsx）===
+    // 物理参数与原版一致；调色板单一暖金白（V3.2 后 ambient 已移除）
+    (function setupFireflies() {
+      // 触屏 / 无 hover 设备 / 用户偏好减少动画 → 直接退出
+      if ('ontouchstart' in window
+        || (matchMedia && matchMedia('(hover: none)').matches)
+        || (matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+        return;
+      }
+
+      const canvas = document.getElementById('cursorFireflies');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const PHYS = {
+        spawnRate: 5, maxParticles: 400, lifeMs: 2800,
+        birthRadius: 28, sizeMin: 1.6, sizeMax: 6.5,
+        repulseRadius: 30, repulseForce: 0.012, attractForce: 0.016,
+        jitter: 0.20, damping: 0.985, maxV: 2.2, bounceFactor: -0.8,
+        flickerBase: 0.6, flickerAmp: 0.4,
+        flickerSpeedMin: 1.0, flickerSpeedMax: 3.0,
+      };
+
+      const PALETTE = [{ born: [243, 180, 142], die: [255, 242, 230] }];  // 暖金白
+      const getPalette = () => PALETTE;
+
+      let w = 0, h = 0, dpr = 1;
+      let mouseX = 0, mouseY = 0, mouseInside = false;
+      let visibility = 0;
+      let lastFrameTime = performance.now();
+      let lastSpawnAcc = 0;
+      const particles = [];
+
+      function spawnParticle(now) {
+        if (particles.length >= PHYS.maxParticles) return;
+        const a = Math.random() * Math.PI * 2;
+        const r = Math.sqrt(Math.random()) * PHYS.birthRadius;
+        const palette = getPalette();
+        const cp = palette[Math.floor(Math.random() * palette.length)];
+        particles.push({
+          x: mouseX + Math.cos(a) * r,
+          y: mouseY + Math.sin(a) * r,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          size: PHYS.sizeMin + Math.random() * (PHYS.sizeMax - PHYS.sizeMin),
+          bornAt: now,
+          phase: Math.random() * Math.PI * 2,
+          flickerSpeed: PHYS.flickerSpeedMin + Math.random() * (PHYS.flickerSpeedMax - PHYS.flickerSpeedMin),
+          colorBorn: cp.born,
+          colorDie: cp.die,
+        });
+      }
+
+      function updateParticles(now, dt) {
+        if (mouseInside) {
+          lastSpawnAcc += PHYS.spawnRate * dt;
+          while (lastSpawnAcc >= 1) { spawnParticle(now); lastSpawnAcc -= 1; }
+        }
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          const age = now - p.bornAt;
+          if (age >= PHYS.lifeMs) { particles.splice(i, 1); continue; }
+
+          p.vx += (Math.random() - 0.5) * PHYS.jitter;
+          p.vy += (Math.random() - 0.5) * PHYS.jitter;
+
+          if (mouseInside) {
+            const dx = mouseX - p.x;
+            const dy = mouseY - p.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > 0.1) {
+              if (dist > PHYS.repulseRadius) {
+                p.vx += (dx / dist) * PHYS.attractForce;
+                p.vy += (dy / dist) * PHYS.attractForce;
+              } else {
+                p.vx -= (dx / dist) * PHYS.repulseForce;
+                p.vy -= (dy / dist) * PHYS.repulseForce;
+              }
+            }
+          }
+
+          p.vx *= PHYS.damping;
+          p.vy *= PHYS.damping;
+          const v = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+          if (v > PHYS.maxV) { p.vx = (p.vx / v) * PHYS.maxV; p.vy = (p.vy / v) * PHYS.maxV; }
+
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0) { p.x = 0; p.vx *= PHYS.bounceFactor; }
+          if (p.x > w) { p.x = w; p.vx *= PHYS.bounceFactor; }
+          if (p.y < 0) { p.y = 0; p.vy *= PHYS.bounceFactor; }
+          if (p.y > h) { p.y = h; p.vy *= PHYS.bounceFactor; }
+          p.phase += p.flickerSpeed * dt;
+        }
+      }
+
+      function renderParticles(now) {
+        ctx.clearRect(0, 0, w, h);
+        for (const p of particles) {
+          const age = now - p.bornAt;
+          const ageRatio = Math.min(1, age / PHYS.lifeMs);
+          const lifeAlpha = ageRatio < 0.7 ? 1 : (1 - (ageRatio - 0.7) / 0.3);
+          const bornAlpha = ageRatio < 0.1 ? ageRatio / 0.1 : 1;
+          const flicker = PHYS.flickerBase + PHYS.flickerAmp * Math.sin(p.phase);
+          const alpha = flicker * lifeAlpha * bornAlpha * visibility;
+          if (alpha < 0.01) continue;
+          const r = Math.floor(p.colorBorn[0] + (p.colorDie[0] - p.colorBorn[0]) * ageRatio);
+          const g = Math.floor(p.colorBorn[1] + (p.colorDie[1] - p.colorBorn[1]) * ageRatio);
+          const b = Math.floor(p.colorBorn[2] + (p.colorDie[2] - p.colorBorn[2]) * ageRatio);
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        w = rect.width; h = rect.height;
+        dpr = window.devicePixelRatio || 1;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+      }
+
+      function loop(now) {
+        const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+        lastFrameTime = now;
+        const targetVis = mouseInside ? 1 : 0;
+        visibility += (targetVis - visibility) * 0.06;
+        updateParticles(now, dt);
+        renderParticles(now);
+        requestAnimationFrame(loop);
+      }
+
+      window.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        if (mx >= 0 && mx <= rect.width && my >= 0 && my <= rect.height) {
+          mouseX = mx; mouseY = my; mouseInside = true;
+        } else {
+          mouseInside = false;
+        }
+      });
+      window.addEventListener('resize', resizeCanvas);
+      document.addEventListener('mouseleave', () => { mouseInside = false; });
+
+      resizeCanvas();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>

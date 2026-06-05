@@ -1,0 +1,7 @@
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+httpx>=0.27.0
+pyncm>=1.7.0
+openai>=1.50.0
+qqmusic-api-python>=0.6.0
+pyyaml>=6.0

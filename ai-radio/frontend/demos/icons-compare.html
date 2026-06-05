@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demo · 旁白/歌词前缀对比</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont/lxgwwenkai-regular.css">
+  <style>
+    :root {
+      --text: #f3eee7;
+      --text-soft: rgba(243, 238, 231, 0.6);
+      --text-fade: rgba(243, 238, 231, 0.38);
+      --accent: #ffd866;
+      --line: rgba(255, 255, 255, 0.08);
+      --font: 'JetBrains Mono', 'IBM Plex Mono', 'LXGW WenKai', monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 5rem 2rem 3rem;
+      overflow-x: hidden;
+      position: relative;
+      background: #0a0a14;
+    }
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(70px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.6;
+    }
+    .orb-1 {
+      width: 560px; height: 560px;
+      background: radial-gradient(circle, #c084fc 0%, transparent 70%);
+      animation: drift1 22s ease-in-out infinite alternate;
+    }
+    .orb-2 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, #f472b6 0%, transparent 70%);
+      animation: drift2 28s ease-in-out infinite alternate;
+    }
+    .orb-3 {
+      width: 460px; height: 460px;
+      background: radial-gradient(circle, #fbbf24 0%, transparent 70%);
+      animation: drift3 25s ease-in-out infinite alternate;
+    }
+    @keyframes drift1 {
+      0% { transform: translate(-30vw, -30vh); }
+      100% { transform: translate(40vw, 35vh); }
+    }
+    @keyframes drift2 {
+      0% { transform: translate(35vw, -20vh); }
+      100% { transform: translate(-25vw, 30vh); }
+    }
+    @keyframes drift3 {
+      0% { transform: translate(0vw, 30vh); }
+      100% { transform: translate(20vw, -25vh); }
+    }
+
+    .demo-nav {
+      position: fixed; top: 1rem; left: 50%; transform: translateX(-50%);
+      display: flex;
+      padding: 0.3rem 0.4rem;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      z-index: 100;
+      font-size: 11px;
+      gap: 0.3rem;
+    }
+    .demo-nav a {
+      padding: 0.3rem 0.8rem;
+      color: var(--text-soft);
+      text-decoration: none;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+    }
+    .demo-nav a:hover { color: var(--text); }
+    .demo-nav a.active { background: var(--accent); color: #0a0a14; }
+
+    .header {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      max-width: 900px;
+      margin: 0 auto 3rem;
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      margin: 0 0 0.5rem;
+    }
+    .header p {
+      font-size: 13px;
+      color: var(--text-soft);
+      margin: 0;
+    }
+
+    .grid {
+      position: relative;
+      z-index: 10;
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .opt {
+      background: rgba(10, 10, 20, 0.55);
+      backdrop-filter: blur(30px) saturate(170%);
+      -webkit-backdrop-filter: blur(30px) saturate(170%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 1.4rem 1.6rem 1.6rem;
+      box-shadow: 0 16px 50px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+    .opt-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 1rem;
+      padding-bottom: 0.7rem;
+      border-bottom: 1px dashed var(--line);
+    }
+    .opt-name {
+      font-size: 13px;
+      color: var(--accent);
+      letter-spacing: 0.15em;
+      font-weight: 700;
+    }
+    .opt-desc {
+      font-size: 11px;
+      color: var(--text-fade);
+      letter-spacing: 0.04em;
+    }
+
+    .demo {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+    .line {
+      font-size: 15px;
+      line-height: 1.7;
+      padding-left: 2rem;
+      position: relative;
+      color: var(--text-soft);
+      opacity: 0.55;
+    }
+    .line.is-narration { font-style: italic; }
+    .line.past { opacity: 0.35; }
+    .line.active {
+      opacity: 1;
+      color: var(--text);
+      font-size: 16px;
+    }
+    .line.active::after {
+      content: "█";
+      animation: blink 1s steps(2) infinite;
+      color: var(--accent);
+      margin-left: 4px;
+      font-size: 12px;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ===== 各组前缀 ===== */
+    /* A: 终端 shell */
+    .opt.A .line.is-narration::before { content: ">"; position: absolute; left: 0; color: var(--accent); font-style: normal; }
+    .opt.A .line.is-lyric::before { content: "$"; position: absolute; left: 0; color: var(--accent); }
+
+    /* B: 箭头 + 音符 */
+    .opt.B .line.is-narration::before { content: "❯"; position: absolute; left: 0; color: var(--accent); font-style: normal; }
+    .opt.B .line.is-lyric::before { content: "♪"; position: absolute; left: 0; color: var(--accent); font-size: 1.05em; top: -1px; }
+
+    /* C: 引号 + 双音符 */
+    .opt.C .line.is-narration::before { content: "❝"; position: absolute; left: 0; color: var(--accent); font-style: normal; font-size: 1.15em; top: -2px; }
+    .opt.C .line.is-lyric::before { content: "♫"; position: absolute; left: 0; color: var(--accent); font-size: 1.05em; top: -1px; }
+
+    /* D: 几何菱形 */
+    .opt.D .line.is-narration::before { content: "◆"; position: absolute; left: 0; color: var(--accent); font-style: normal; font-size: 0.7em; top: 4px; }
+    .opt.D .line.is-lyric::before { content: "◇"; position: absolute; left: 0; color: var(--accent); font-size: 0.7em; top: 4px; }
+
+    /* E: 中文标签 */
+    .opt.E .line { padding-left: 3.2rem; }
+    .opt.E .line.is-narration::before { content: "［旁白］"; position: absolute; left: 0; color: var(--accent); font-style: normal; font-size: 0.7em; top: 4px; letter-spacing: 0; }
+    .opt.E .line.is-lyric::before { content: "［歌词］"; position: absolute; left: 0; color: var(--accent); font-size: 0.7em; top: 4px; letter-spacing: 0; }
+
+    /* F: 极简竖线 */
+    .opt.F .line.is-narration::before { content: "│"; position: absolute; left: 0; color: var(--accent); font-style: normal; font-weight: 700; }
+    .opt.F .line.is-lyric::before { content: "▎"; position: absolute; left: 0; color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="demo-nav">
+    <a href="card-drift-large.html">加大卡片</a>
+    <a href="icons-compare.html" class="active">前缀对比</a>
+    <a href="/">原版</a>
+  </div>
+
+  <div class="header">
+    <h1>选一组旁白 / 歌词前缀</h1>
+    <p>每组左侧是旁白图标，右侧是歌词图标。底部那行模拟"当前正在播"，带光标闪烁</p>
+  </div>
+
+  <div class="grid">
+    <div class="opt A">
+      <div class="opt-head">
+        <span class="opt-name">A · 终端 SHELL</span>
+        <span class="opt-desc">&gt; 和 $（当前版）</span>
+      </div>
+      <div class="demo">
+        <div class="line is-narration past">天空忽然就晴了。</div>
+        <div class="line is-narration past">这是周杰伦的《晴天》。</div>
+        <div class="line is-lyric past">故事的小黄花</div>
+        <div class="line is-lyric active">童年的荡秋千</div>
+      </div>
+    </div>
+
+    <div class="opt B">
+      <div class="opt-head">
+        <span class="opt-name">B · 现代箭头</span>
+        <span class="opt-desc">❯ 和 ♪</span>
+      </div>
+      <div class="demo">
+        <div class="line is-narration past">天空忽然就晴了。</div>
+        <div class="line is-narration past">这是周杰伦的《晴天》。</div>
+        <div class="line is-lyric past">故事的小黄花</div>
+        <div class="line is-lyric active">童年的荡秋千</div>
+      </div>
+    </div>
+
+    <div class="opt C">
+      <div class="opt-head">
+        <span class="opt-name">C · 引号 + 音符</span>
+        <span class="opt-desc">❝ 和 ♫</span>
+      </div>
+      <div class="demo">
+        <div class="line is-narration past">天空忽然就晴了。</div>
+        <div class="line is-narration past">这是周杰伦的《晴天》。</div>
+        <div class="line is-lyric past">故事的小黄花</div>
+        <div class="line is-lyric active">童年的荡秋千</div>
+      </div>
+    </div>
+
+    <div class="opt D">
+      <div class="opt-head">
+        <span class="opt-name">D · 几何菱形</span>
+        <span class="opt-desc">◆ 实 / ◇ 空</span>
+      </div>
+      <div class="demo">
+        <div class="line is-narration past">天空忽然就晴了。</div>
+        <div class="line is-narration past">这是周杰伦的《晴天》。</div>
+        <div class="line is-lyric past">故事的小黄花</div>
+        <div class="line is-lyric active">童年的荡秋千</div>
+      </div>
+    </div>
+
+    <div class="opt E">
+      <div class="opt-head">
+        <span class="opt-name">E · 中文标签</span>
+        <span class="opt-desc">［旁白］ ／ ［歌词］</span>
+      </div>
+      <div class="demo">
+        <div class="line is-narration past">天空忽然就晴了。</div>
+        <div class="line is-narration past">这是周杰伦的《晴天》。</div>
+        <div class="line is-lyric past">故事的小黄花</div>
+        <div class="line is-lyric active">童年的荡秋千</div>
+      </div>
+    </div>
+
+    <div class="opt F">
+      <div class="opt-head">
+        <span class="opt-name">F · 极简竖线</span>
+        <span class="opt-desc">│ 细 / ▎ 粗</span>
+      </div>
+      <div class="demo">
+        <div class="line is-narration past">天空忽然就晴了。</div>
+        <div class="line is-narration past">这是周杰伦的《晴天》。</div>
+        <div class="line is-lyric past">故事的小黄花</div>
+        <div class="line is-lyric active">童年的荡秋千</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
