@@ -1,0 +1,77 @@
+# ==================================================
+# AI 音乐电台 · 项目根 .gitignore
+# 发布前必须 0 残留个人数据；所有 *.example / *.example.* 样板需被追踪
+# ==================================================
+
+# ----- 用户配置 / 凭证 / cookie / 偏好（每人不同） -----
+
+# 后端凭证（保留 config.example.json 作为占位样板）
+ai-radio/data/config.json
+ai-radio/data/config.json.bak
+
+# TTS 缓存 / 本地歌曲 / 旁白稿 / 历史事件本地缓存
+ai-radio/data/cache/
+ai-radio/data/songs/
+ai-radio/data/notes/scripts/
+ai-radio/data/facts/history/
+
+# 用户反馈日志 / 听歌画像歌单（保留 taste.example.md）
+ai-radio/data/feedback.jsonl
+ai-radio/data/user/taste.md
+ai-radio/data/user/playlists/
+
+# ----- 私人听歌数据 -----
+
+# QQ 年度报告原始截图 + 识图产出 yaml（保留 年度报告截图.example/ 样板）
+年度报告截图/
+qq音乐各年度报告查询链接.md
+
+# ----- 项目所有者私人开发记录（不开源） -----
+
+开发文件/
+
+# ----- 本地配置（每台机器不同） -----
+
+.claude/CLAUDE.md.local
+CLAUDE.local.md
+*.local
+.env
+.env.local
+
+# ----- 第三方库（含独立 .git 仓 + QQ 凭据 sqlite，发布时让用户自行 clone 上游） -----
+
+third_party/QQMusicApi/
+
+# ----- 测试素材（含版权音频 / 个人测试内容） -----
+
+测试文件/
+
+# ----- 通用 -----
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+.next/
+build/
+
+# IDE / 本地工具索引
+.vscode/
+.idea/
+.cursor/
+.codegraph/
+.claude/settings.local.json
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

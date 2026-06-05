@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+
+# Node
+node_modules/
+dist/
+
+# Data — 具体文件 / 子目录（让 example / seed 文件能进仓）
+data/config.json
+data/config.json.bak
+data/cache/
+data/songs/
+data/notes/scripts/
+data/facts/history/
+data/feedback.jsonl
+data/user/taste.md
+data/user/playlists/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

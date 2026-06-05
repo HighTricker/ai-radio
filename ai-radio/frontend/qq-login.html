@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QQ 音乐扫码登录 · AI 电台</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont/lxgwwenkai-regular.css">
+<style>
+  :root {
+    --mysteria: #1b1938;
+    --lavender: #cbb7fb;
+    --charcoal: #292827;
+    --cream: #e9e5dd;
+    --parchment: #dcd7d3;
+    --white: #ffffff;
+    --ok: #2f7d3a;
+    --warn: #b87b00;
+    --err: #b3261e;
+    --muted: #6b6b6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'LXGW WenKai', system-ui, -apple-system, "Segoe UI", serif;
+    background: linear-gradient(160deg, #1b1938 0%, #2c2452 60%, #3a2d6f 100%);
+    min-height: 100vh;
+    color: var(--charcoal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 460px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .card h1 {
+    margin: 0 0 8px;
+    font-size: 26px;
+    line-height: 1.20;
+    font-weight: 600;
+  }
+  .card .sub {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 28px;
+    line-height: 1.50;
+  }
+
+  .qr-box {
+    width: 240px;
+    height: 240px;
+    margin: 0 auto 20px;
+    border: 1px solid var(--parchment);
+    border-radius: 12px;
+    background: var(--cream);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .qr-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .qr-box .placeholder {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .qr-box.success::after {
+    content: '✓ 已登录';
+    position: absolute;
+    inset: 0;
+    background: rgba(47, 125, 58, 0.95);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 600;
+    border-radius: 12px;
+  }
+  .qr-box.expired::after {
+    content: '已过期，请刷新';
+    position: absolute;
+    inset: 0;
+    background: rgba(179, 38, 30, 0.92);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 12px;
+  }
+
+  .status {
+    font-size: 15px;
+    margin: 0 0 20px;
+    min-height: 24px;
+    color: var(--charcoal);
+  }
+  .status .pulse {
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--lavender);
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: 1px;
+    animation: pulse 1.2s infinite;
+  }
+  .status.ok { color: var(--ok); font-weight: 600; }
+  .status.err { color: var(--err); }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.4); }
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  button {
+    background: var(--cream);
+    color: var(--charcoal);
+    border: none;
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary {
+    background: var(--mysteria);
+    color: var(--lavender);
+  }
+
+  .info {
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.50;
+    text-align: left;
+    padding: 12px 14px;
+    background: #faf7f2;
+    border-radius: 8px;
+    border: 1px solid var(--parchment);
+  }
+  .info b { color: var(--charcoal); }
+
+  .cred-preview {
+    margin-top: 16px;
+    background: #f1ecff;
+    border: 1px solid var(--lavender);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--mysteria);
+    text-align: left;
+    word-break: break-all;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>QQ 音乐扫码登录</h1>
+  <p class="sub">用手机 QQ 扫码 → cookie 自动落到电台后端，永不需要手动复制粘贴。</p>
+
+  <div class="qr-box" id="qrBox">
+    <span class="placeholder" id="qrPlaceholder">正在加载二维码…</span>
+    <img id="qrImg" style="display:none" alt="QR Code">
+  </div>
+
+  <div class="status" id="status"><span class="pulse"></span>正在请求二维码…</div>
+
+  <div class="actions">
+    <button class="primary" id="refreshBtn" onclick="loadQR()">刷新二维码</button>
+    <button onclick="window.location.href='/'">返回播放器</button>
+  </div>
+
+  <div class="info">
+    <b>使用步骤：</b><br>
+    1. 手机打开 QQ → 扫一扫上面二维码<br>
+    2. 在手机上确认登录<br>
+    3. 等本页显示「已登录」即成功，cookie 自动写入 <code>config.json</code><br>
+    4. 之后回播放器试播 —— QQ 音乐应该完全恢复
+  </div>
+
+  <div class="cred-preview" id="credPreview" style="display:none"></div>
+</div>
+
+<script>
+  const STATUS_TEXT = {
+    [-1]: '其他错误',
+    0: '✓ 登录成功！',
+    1: '⌛ 等待扫描…',
+    2: '📱 已扫描，请在手机上确认',
+    3: '⏰ 二维码已过期',
+    4: '✗ 已被拒绝',
+  };
+
+  let identifier = null;
+  let pollTimer = null;
+
+  const qrBox = document.getElementById('qrBox');
+  const qrImg = document.getElementById('qrImg');
+  const qrPlaceholder = document.getElementById('qrPlaceholder');
+  const statusEl = document.getElementById('status');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const credPreview = document.getElementById('credPreview');
+
+  async function loadQR() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    qrBox.classList.remove('success', 'expired');
+    qrImg.style.display = 'none';
+    qrPlaceholder.style.display = '';
+    qrPlaceholder.textContent = '正在加载二维码…';
+    statusEl.innerHTML = '<span class="pulse"></span>正在请求二维码…';
+    statusEl.className = 'status';
+    refreshBtn.disabled = true;
+    credPreview.style.display = 'none';
+
+    try {
+      const r = await fetch('/api/v1/qq-login/qrcode');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const body = await r.json();
+      const data = body.data || {};
+      if (!data.img || !data.identifier) throw new Error('二维码数据为空');
+      identifier = data.identifier;
+      qrImg.src = data.img;
+      qrImg.style.display = '';
+      qrPlaceholder.style.display = 'none';
+      statusEl.innerHTML = '<span class="pulse"></span>请用手机 QQ 扫码…';
+      refreshBtn.disabled = false;
+      pollTimer = setInterval(pollStatus, 3000);
+    } catch (e) {
+      qrPlaceholder.textContent = '加载失败';
+      statusEl.textContent = '✗ ' + e.message;
+      statusEl.className = 'status err';
+      refreshBtn.disabled = false;
+    }
+  }
+
+  async function pollStatus() {
+    if (!identifier) return;
+    try {
+      const r = await fetch('/api/v1/qq-login/status?identifier=' + encodeURIComponent(identifier));
+      if (!r.ok) return;
+      const body = await r.json();
+      const data = body.data || {};
+      const event = data.event;
+      const text = STATUS_TEXT[event] || '未知状态';
+
+      if (event === 0) {
+        // 登录成功
+        clearInterval(pollTimer); pollTimer = null;
+        qrBox.classList.add('success');
+        statusEl.textContent = text;
+        statusEl.className = 'status ok';
+        if (data.credential) {
+          credPreview.style.display = '';
+          credPreview.textContent = 'musicid=' + data.credential.musicid +
+            '\nmusickey=' + (data.credential.musickey || '').substring(0, 16) + '...' +
+            '\n（完整 credential 已自动写入 data/config.json）';
+        }
+      } else if (event === 3 || event === 4) {
+        // 过期 / 拒绝
+        clearInterval(pollTimer); pollTimer = null;
+        qrBox.classList.add('expired');
+        statusEl.textContent = text;
+        statusEl.className = 'status err';
+      } else {
+        // 等待中
+        statusEl.innerHTML = '<span class="pulse"></span>' + text;
+        statusEl.className = 'status';
+      }
+    } catch (e) {
+      // 网络抖动忽略
+    }
+  }
+
+  loadQR();
+</script>
+
+</body>
+</html>

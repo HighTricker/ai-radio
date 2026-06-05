@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 音乐电台 · 技术全景</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont/lxgwwenkai-regular.css">
+<style>
+  :root {
+    --mysteria: #1b1938;
+    --lavender: #cbb7fb;
+    --charcoal: #292827;
+    --cream: #e9e5dd;
+    --parchment: #dcd7d3;
+    --white: #ffffff;
+    --link: #714cb6;
+    --ok: #2f7d3a;
+    --warn: #b87b00;
+    --err: #b3261e;
+    --muted: #6b6b6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'LXGW WenKai', 'Super Sans VF', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, serif;
+    background: var(--white);
+    color: var(--charcoal);
+    line-height: 1.50;
+    font-size: 16px;
+  }
+  a { color: var(--link); }
+
+  /* ===== Hero ===== */
+  .hero {
+    background: linear-gradient(160deg, #1b1938 0%, #2c2452 60%, #3a2d6f 100%);
+    color: rgba(255,255,255,0.95);
+    padding: 64px 32px 80px;
+    text-align: center;
+  }
+  .hero h1 {
+    font-size: 56px;
+    line-height: 0.96;
+    letter-spacing: -1.32px;
+    margin: 0 0 16px;
+    font-weight: 600;
+  }
+  .hero .tag {
+    display: inline-block;
+    background: rgba(203,183,251,0.15);
+    color: var(--lavender);
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(203,183,251,0.3);
+  }
+  .hero p.subtitle {
+    font-size: 20px;
+    max-width: 680px;
+    margin: 0 auto 8px;
+    color: rgba(255,255,255,0.85);
+    line-height: 1.40;
+  }
+  .hero .meta {
+    margin-top: 24px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.5px;
+  }
+  .hero .meta span { margin: 0 12px; }
+  .hero .meta b { color: var(--lavender); font-weight: 700; }
+
+  /* ===== Section ===== */
+  section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 56px 32px 16px;
+  }
+  h2 {
+    font-size: 36px;
+    line-height: 1.10;
+    letter-spacing: -0.55px;
+    margin: 0 0 8px;
+    font-weight: 600;
+    color: var(--charcoal);
+  }
+  h2 .num {
+    display: inline-block;
+    color: var(--lavender);
+    font-size: 14px;
+    letter-spacing: 2px;
+    vertical-align: middle;
+    margin-right: 12px;
+    font-weight: 700;
+    background: var(--mysteria);
+    padding: 4px 10px;
+    border-radius: 8px;
+  }
+  h2 + .lede {
+    color: var(--muted);
+    font-size: 15px;
+    margin: 0 0 28px;
+    max-width: 680px;
+  }
+  h3 {
+    font-size: 20px;
+    margin: 32px 0 12px;
+    color: var(--charcoal);
+    font-weight: 600;
+    line-height: 1.30;
+  }
+
+  /* ===== 四层架构（顶层视图） ===== */
+  .layers {
+    display: grid;
+    gap: 12px;
+  }
+  .layer {
+    border: 1px solid var(--parchment);
+    border-radius: 16px;
+    padding: 18px 24px;
+    background: var(--white);
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 20px;
+    align-items: center;
+  }
+  .layer .label {
+    font-weight: 700;
+    color: var(--charcoal);
+    font-size: 18px;
+  }
+  .layer .label small {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+  .layer .modules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip {
+    background: var(--cream);
+    color: var(--charcoal);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.20;
+    border: 1px solid var(--parchment);
+  }
+  .chip.accent { background: var(--lavender); border-color: var(--lavender); }
+  .chip.ext { background: #fff; border-style: dashed; color: var(--muted); }
+
+  /* 不同层用不同左边色条 */
+  .layer.l-frontend { border-left: 4px solid #6cb4ff; }
+  .layer.l-route   { border-left: 4px solid var(--lavender); }
+  .layer.l-service { border-left: 4px solid #ffa05a; }
+  .layer.l-data    { border-left: 4px solid #7dcc7d; }
+  .layer.l-external{ border-left: 4px solid #d49797; background: #fdfaf7; }
+
+  /* ===== 数据流图（一次播放完整链路） ===== */
+  .flow {
+    background: #fdfbf6;
+    border: 1px solid var(--parchment);
+    border-radius: 16px;
+    padding: 28px;
+  }
+  .flow-row {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 14px 0;
+    border-bottom: 1px dashed var(--parchment);
+  }
+  .flow-row:last-child { border-bottom: none; }
+  .flow-num {
+    background: var(--mysteria);
+    color: var(--lavender);
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px;
+  }
+  .flow-body strong {
+    display: block;
+    font-size: 16px;
+    color: var(--charcoal);
+    margin-bottom: 4px;
+  }
+  .flow-body code {
+    background: var(--cream);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12.5px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: #5a3a8c;
+  }
+  .flow-body .note {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ===== 模块矩阵（M1-M6 来自 bug.md） ===== */
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .module {
+    border: 1px solid var(--parchment);
+    border-radius: 16px;
+    padding: 18px 20px;
+    background: var(--white);
+  }
+  .module h4 {
+    margin: 0 0 6px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .module h4 .badge {
+    background: var(--mysteria);
+    color: var(--lavender);
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    margin-right: 8px;
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.5px;
+    vertical-align: 1px;
+  }
+  .module .files {
+    margin: 6px 0;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-family: ui-monospace, monospace;
+  }
+  .module .desc {
+    font-size: 14px;
+    color: var(--charcoal);
+    margin: 6px 0 0;
+    line-height: 1.45;
+  }
+
+  /* ===== 外部依赖矩阵 ===== */
+  .deps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .dep {
+    border: 1px solid var(--parchment);
+    border-radius: 16px;
+    padding: 16px;
+    text-align: center;
+    background: var(--white);
+  }
+  .dep .icon {
+    font-size: 28px;
+    margin-bottom: 6px;
+  }
+  .dep .name {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  .dep .role {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .dep .status {
+    font-size: 11.5px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    display: inline-block;
+    letter-spacing: 0.5px;
+  }
+  .dep .status.ok { background: #e6f5e9; color: var(--ok); }
+  .dep .status.warn { background: #fdf3df; color: var(--warn); }
+  .dep .status.err { background: #fae3e1; color: var(--err); }
+
+  /* ===== 阶段进度时间线 ===== */
+  .timeline {
+    border-left: 2px solid var(--lavender);
+    padding-left: 20px;
+    margin-left: 8px;
+  }
+  .stage {
+    margin-bottom: 22px;
+    position: relative;
+  }
+  .stage::before {
+    content: '';
+    width: 12px; height: 12px;
+    background: var(--lavender);
+    border: 2px solid var(--white);
+    border-radius: 50%;
+    position: absolute;
+    left: -27px;
+    top: 6px;
+    box-shadow: 0 0 0 1px var(--lavender);
+  }
+  .stage.done::before { background: var(--ok); box-shadow: 0 0 0 1px var(--ok); }
+  .stage.now::before { background: var(--warn); box-shadow: 0 0 0 1px var(--warn); animation: pulse 2s infinite; }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+  }
+  .stage h4 {
+    margin: 0 0 4px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .stage h4 .tag {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    margin-left: 8px;
+    background: var(--cream);
+    color: var(--muted);
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+  .stage h4 .tag.done { background: #e6f5e9; color: var(--ok); }
+  .stage h4 .tag.now { background: #fdf3df; color: var(--warn); }
+  .stage .when {
+    color: var(--muted);
+    font-size: 12.5px;
+    margin-bottom: 4px;
+  }
+  .stage p {
+    margin: 4px 0;
+    font-size: 14px;
+    color: var(--charcoal);
+  }
+
+  /* ===== 已知问题 ===== */
+  .issues {
+    display: grid;
+    gap: 10px;
+  }
+  .issue {
+    border-left: 4px solid var(--err);
+    background: #fdf6f5;
+    padding: 12px 16px;
+    border-radius: 0 12px 12px 0;
+  }
+  .issue.warn { border-left-color: var(--warn); background: #fdfaf2; }
+  .issue.info { border-left-color: var(--lavender); background: #f7f3ff; }
+  .issue h5 {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .issue h5 .id {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    background: var(--charcoal);
+    color: var(--white);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 6px;
+  }
+  .issue p {
+    margin: 4px 0 0;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  /* ===== Footer ===== */
+  footer {
+    text-align: center;
+    padding: 40px 32px 56px;
+    color: var(--muted);
+    font-size: 12.5px;
+    border-top: 1px solid var(--parchment);
+    margin-top: 48px;
+  }
+  footer .links a {
+    margin: 0 10px;
+    color: var(--link);
+    text-decoration: none;
+  }
+  footer .links a:hover { text-decoration: underline; }
+
+  /* 移动端 */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 36px; }
+    .hero p.subtitle { font-size: 16px; }
+    .layer { grid-template-columns: 1fr; }
+    .matrix { grid-template-columns: 1fr; }
+    .deps { grid-template-columns: repeat(2, 1fr); }
+    section { padding: 40px 20px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <span class="tag">AI MUSIC RADIO · 技术全景</span>
+  <h1>懂你的私人电台</h1>
+  <p class="subtitle">AI 主播 + 听歌画像 + 真实音乐 API，按心情/天气/今天写旁白，渐进式播放歌曲。</p>
+  <div class="meta">
+    <span>当前阶段 · <b>V4.1 · 打磨发布</b></span>
+    <span>歌单规模 · <b>173 首</b>（5 年合并去重）</span>
+    <span>项目所有者 · <b>鲁家琪</b></span>
+  </div>
+</div>
+
+<!-- ===================================================== -->
+<section>
+  <h2><span class="num">01</span>整体分层</h2>
+  <p class="lede">从浏览器到外部 API，全栈 5 层垂直架构。每层只暴露薄接口给上层，方便单独替换/降级。</p>
+
+  <div class="layers">
+
+    <div class="layer l-frontend">
+      <div class="label">用户层<small>BROWSER · PWA</small></div>
+      <div class="modules">
+        <span class="chip accent">frontend/index.html · 单文件 ~89KB</span>
+        <span class="chip">Vanilla JS（无框架）</span>
+        <span class="chip">Web Audio API · AudioContext + 双 SourceNode + GainNode</span>
+        <span class="chip">DJ 时间对齐（LRC 第一句歌词时间戳）</span>
+        <span class="chip">霞鹜文楷 + Mysteria Purple 视觉</span>
+      </div>
+    </div>
+
+    <div class="layer l-route">
+      <div class="label">编排层<small>FASTAPI ROUTES</small></div>
+      <div class="modules">
+        <span class="chip accent">backend/main.py · uvicorn :8000</span>
+        <span class="chip">/api/v1/episode（核心入口）</span>
+        <span class="chip">/api/v1/tts/{hash}</span>
+        <span class="chip">/api/v1/song/{src}/{id}</span>
+        <span class="chip">/api/v1/voices · modes · config · environment · feedback</span>
+        <span class="chip">CORS + no-cache HTML middleware</span>
+        <span class="chip">lifespan 启动钩子（触发预热）</span>
+      </div>
+    </div>
+
+    <div class="layer l-service">
+      <div class="label">服务层<small>BACKEND/SERVICES</small></div>
+      <div class="modules">
+        <span class="chip">prewarm.py · 5 首预热队列（线程 + Lock）</span>
+        <span class="chip">recommender.py · LLM 选歌 + 反馈过滤</span>
+        <span class="chip">llm.py · 多 mode 写稿调度</span>
+        <span class="chip">llm_providers.py · MiMo / DeepSeek 双源</span>
+        <span class="chip">fish_audio.py · TTS 合成 + 缓存</span>
+        <span class="chip">song_cache.py · 歌曲本地下载</span>
+        <span class="chip">environment.py · 地理 + 天气</span>
+        <span class="chip">facts.py · 维基 / 时令富化</span>
+        <span class="chip">listening_facts.py · 年度听歌 facts 池</span>
+        <span class="chip">playlist.py + yearly_playlist_loader.py · 歌单合并</span>
+      </div>
+    </div>
+
+    <div class="layer l-service">
+      <div class="label">适配器<small>BACKEND/ADAPTERS</small></div>
+      <div class="modules">
+        <span class="chip accent">qqmusic.py · QQ 音乐（默认源）</span>
+        <span class="chip">netease.py · 网易云（兜底）</span>
+        <span class="chip">base.py · Track 统一接口</span>
+      </div>
+    </div>
+
+    <div class="layer l-data">
+      <div class="label">数据层<small>data/ · 文件存储</small></div>
+      <div class="modules">
+        <span class="chip">config.json · API keys + settings</span>
+        <span class="chip">user/taste.md · 个人歌单偏好</span>
+        <span class="chip">cache/songs/*.mp3 · 歌曲本地缓存</span>
+        <span class="chip">cache/tts/*.mp3 · TTS hash 缓存</span>
+        <span class="chip">notes/scripts/*.md · 手写稿件</span>
+        <span class="chip">feedback.jsonl · 喜欢/不喜欢日志</span>
+        <span class="chip">年度报告截图/ · QQ 听歌报告 facts 源</span>
+      </div>
+    </div>
+
+    <div class="layer l-external">
+      <div class="label">外部依赖<small>EXTERNAL APIs</small></div>
+      <div class="modules">
+        <span class="chip ext">DeepSeek API · LLM 写稿（主）</span>
+        <span class="chip ext">小米 MiMo API · LLM 写稿（备）</span>
+        <span class="chip ext">Fish Audio · 中文 TTS</span>
+        <span class="chip ext">QQ 音乐 CGI（qqmusic-api-python）</span>
+        <span class="chip ext">网易云 API（pyncm）</span>
+        <span class="chip ext">和风天气 qWeather</span>
+        <span class="chip ext">浏览器 Geolocation</span>
+        <span class="chip ext">维基百科 API</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<section>
+  <h2><span class="num">02</span>一次播放的完整数据流</h2>
+  <p class="lede">从用户点 ▶ 到耳朵听到声音，后端要走的全部环节。预热命中走 fast path，未命中走 cold path（约 10–15s）。</p>
+
+  <div class="flow">
+
+    <div class="flow-row">
+      <div class="flow-num">0</div>
+      <div class="flow-body">
+        <strong>启动期（lifespan startup）</strong>
+        <code>prewarm_queue.start(default_voice, "song_intro")</code>
+        <div class="note">后台 daemon 线程跑满 5 首待播 episode（推荐器 + 多源 + 缓存 + 稿件 + TTS 全流水），永远维持队列长度 5。预热失败不阻塞用户请求。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">1</div>
+      <div class="flow-body">
+        <strong>用户点 ▶ → <code>GET /api/v1/episode?direction=next&voice=...&mode=...</code></strong>
+        <div class="note">前端 fetch 拿 episode payload。next 方向先 try_pop 预热队列。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">2a</div>
+      <div class="flow-body">
+        <strong>FAST PATH：预热命中（理想路径）</strong>
+        <code>prewarm_queue.try_pop(voice, mode, is_disliked)</code>
+        <div class="note">命中即秒响应（~10ms），同步全局 _cursor + _recent_history，后台异步 refill 补一首。命中条件：voice/mode 匹配 + 未过期（&lt; 30 分钟）+ dislike 未超阈值。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">2b</div>
+      <div class="flow-body">
+        <strong>COLD PATH：未命中（重新跑全流水）</strong>
+        <code>recommender.recommend_next(候选, recent, feedback, weather)</code>
+        <div class="note">LLM 看候选歌单 + 最近 5 首 + 反馈 + 天气，选下一首。失败回退 cursor 顺序选歌。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">3</div>
+      <div class="flow-body">
+        <strong>多源调度：QQ 优先 → 网易兜底</strong>
+        <code>qqmusic.get_track_by_songmid()</code> → <code>netease.get_track()</code>
+        <div class="note">优先用年度报告解析出的 songmid 走 QQ 直链（VIP 月费覆盖 95%+）；QQ 失败/无 songmid 时网易兜底。两个都失败返回 track_not_found。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">4</div>
+      <div class="flow-body">
+        <strong>歌曲下载缓存（避开 20 分钟直链过期）</strong>
+        <code>song_cache.fetch_and_cache(source, source_id, audio_url)</code>
+        <div class="note">流式写到 <code>data/cache/songs/{source}_{id}.mp3</code>。命中已有 cache 直接返回。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">5</div>
+      <div class="flow-body">
+        <strong>稿件：手写优先 → LLM 自动生成</strong>
+        <code>llm._read_or_generate_script(entry, lyric, mode, environment)</code>
+        <div class="note">先查 <code>data/notes/scripts/&lt;歌名&gt;.md</code> 手写稿；没有则按 mode 调 LLM（song_intro / classic_prose / history_today / quotation / weather_mood），生成后落盘做缓存。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">6</div>
+      <div class="flow-body">
+        <strong>Fish Audio TTS 合成</strong>
+        <code>fish_audio.synthesize(script, voice_id)</code>
+        <div class="note">按 (text, voice_id) 算 sha256 hash → 查 <code>data/cache/tts/&lt;hash&gt;.mp3</code>。命中瞬时；未命中调 Fish Audio API（5–10s）后落盘。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">7</div>
+      <div class="flow-body">
+        <strong>返回 episode payload（JSON）</strong>
+        <div class="note">字段包括 <code>tts_url</code> · <code>song_url</code> · <code>song_title</code> · <code>artist</code> · <code>cover_url</code> · <code>lyric</code>（LRC）· <code>script</code> · <code>mode</code> · <code>degraded</code> · <code>recommend_reason</code>。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">8</div>
+      <div class="flow-body">
+        <strong>前端：Web Audio 双轨混音</strong>
+        <code>ctx.decodeAudioData()</code> + 旁白 100% / 歌曲 15% 同步 start
+        <div class="note">DJ 时间对齐：解析 LRC 第一句歌词时间戳，让旁白结束 ≈ 歌曲第一句歌词出现。旁白结束后 3 秒线性渐升歌曲到 100%。</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-num">9</div>
+      <div class="flow-body">
+        <strong>歌曲播完 → 自动续播</strong>
+        <code>songSource.onended → scheduleAutoNext(2)</code>
+        <div class="note">2 秒短暂停（电台主播切歌「喘气感」）→ 触发 nextEpisode → 回到流程 1。如果队列预热中已就绪，下一首 0 等待。</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<section>
+  <h2><span class="num">03</span>模块矩阵 M1–M6</h2>
+  <p class="lede">六大模块（与 bug.md 完全对齐）。每个模块单点失败时，邻近模块兜底降级。</p>
+
+  <div class="matrix">
+
+    <div class="module">
+      <h4><span class="badge">M1</span>编排</h4>
+      <div class="files">backend/main.py · backend/services/prewarm.py · recommender.py</div>
+      <p class="desc">episode 路由 + cursor 推进 + 预热队列 + 反馈跳过阈值（dislike ≥ 2 自动跳）。fast/cold 双路径合并，对前端是单一接口。</p>
+    </div>
+
+    <div class="module">
+      <h4><span class="badge">M2</span>歌源</h4>
+      <div class="files">backend/adapters/qqmusic.py · netease.py · base.py</div>
+      <p class="desc">QQ 优先（按年度报告 songmid 直取）→ 网易兜底（搜索匹配）。Track 统一接口暴露 audio_url + cover_url + lyric。本地 cache 避开 20 分钟直链过期。</p>
+    </div>
+
+    <div class="module">
+      <h4><span class="badge">M3</span>文案 & TTS</h4>
+      <div class="files">services/llm.py · llm_providers.py · fish_audio.py · listening_facts.py · facts.py</div>
+      <p class="desc">5 种 mode（song_intro / classic_prose / history_today / quotation / weather_mood）+ DeepSeek/MiMo 双 LLM provider 切换。Fish Audio TTS 按 hash 缓存。listening_facts 池注入「你的偏好」。</p>
+    </div>
+
+    <div class="module">
+      <h4><span class="badge">M4</span>播放器</h4>
+      <div class="files">frontend/index.html · Web Audio API</div>
+      <p class="desc">AudioContext + 双 SourceNode + GainNode 混音引擎。DJ 时间对齐（LRC 第一句歌词时间戳跳过前奏）+ 进度条 + 上下首 + 自动续播。</p>
+    </div>
+
+    <div class="module">
+      <h4><span class="badge">M5</span>UI</h4>
+      <div class="files">frontend/index.html（CSS + DOM）</div>
+      <p class="desc">极简底栏播放器 + 流动歌词卡片 + 配置面板 + 萤火虫粒子。Superhuman 视觉系统（Mysteria Purple + Lavender + 霞鹜文楷）。V3.1 后已删氛围视频/呼吸效果，纯音频体验。</p>
+    </div>
+
+    <div class="module">
+      <h4><span class="badge">M6</span>配置 & 数据</h4>
+      <div class="files">data/config.json · user/taste.md · feedback.jsonl · 年度报告截图/</div>
+      <p class="desc">所有 API key + 个人偏好 + 听歌历史。<code>data/</code> 整体 .gitignore，敏感字段隔离。年度报告截图驱动 5 年 209 首歌单合并 + listening_facts 池。</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<section>
+  <h2><span class="num">04</span>外部依赖矩阵</h2>
+  <p class="lede">8 个外部服务，每个都有降级路径。绿色=健康 / 黄色=有风险 / 红色=当前失效。</p>
+
+  <div class="deps">
+
+    <div class="dep">
+      <div class="icon">🎵</div>
+      <div class="name">QQ 音乐</div>
+      <div class="role">默认源 · 95%+ 覆盖</div>
+      <div class="status err">cookie 失效中</div>
+    </div>
+
+    <div class="dep">
+      <div class="icon">🎶</div>
+      <div class="name">网易云</div>
+      <div class="role">兜底 · pyncm</div>
+      <div class="status warn">vipType=0 大量 404</div>
+    </div>
+
+    <div class="dep">
+      <div class="icon">🤖</div>
+      <div class="name">DeepSeek</div>
+      <div class="role">LLM 主 · 写稿 5s</div>
+      <div class="status ok">健康</div>
+    </div>
+
+    <div class="dep">
+      <div class="icon">🤖</div>
+      <div class="name">小米 MiMo</div>
+      <div class="role">LLM 备 · 写稿 5s</div>
+      <div class="status ok">健康</div>
+    </div>
+
+    <div class="dep">
+      <div class="icon">🎙️</div>
+      <div class="name">Fish Audio</div>
+      <div class="role">TTS · voice_id</div>
+      <div class="status ok">健康</div>
+    </div>
+
+    <div class="dep">
+      <div class="icon">🌤️</div>
+      <div class="name">和风天气</div>
+      <div class="role">环境感知</div>
+      <div class="status ok">健康</div>
+    </div>
+
+    <div class="dep">
+      <div class="icon">📍</div>
+      <div class="name">浏览器 Geo</div>
+      <div class="role">定位 · 优先 IP 兜底</div>
+      <div class="status warn">需用户授权</div>
+    </div>
+
+    <div class="dep">
+      <div class="icon">📚</div>
+      <div class="name">维基百科</div>
+      <div class="role">facts 富化</div>
+      <div class="status ok">健康</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<section>
+  <h2><span class="num">05</span>阶段进度</h2>
+  <p class="lede">从 V1 端到端打通，到 V4.1 准备开源。当前在 V4.1 打磨发布最后冲刺。</p>
+
+  <div class="timeline">
+
+    <div class="stage done">
+      <h4>V1 端到端打通 <span class="tag done">完成 2026-04-30</span></h4>
+      <div class="when">本地多歌 + 手写文案 + Fish Audio TTS + Web Audio 混音</div>
+      <p>3 秒线性渐升 + 暂停继续 + 下一首 + 背景音量滑块。</p>
+    </div>
+
+    <div class="stage done">
+      <h4>V2 真实音乐 + 视觉重构 <span class="tag done">完成 2026-04-30</span></h4>
+      <div class="when">网易云 + LRC + DJ 时间对齐 + LLM 自动改写 + 多音色 + Superhuman 视觉</div>
+      <p>从「本地歌」到「真实曲库」+ 完整播放页 UI（海报、流动歌词、卡拉 OK 高亮）。</p>
+    </div>
+
+    <div class="stage done">
+      <h4>V3 / V3.1 / V3.2 环境感知 + 视觉精修 <span class="tag done">完成 2026-05-13</span></h4>
+      <div class="when">地理 + 天气 + 时间 + 大模型自主写稿 + 光斑漂移卡片视觉</div>
+      <p>V3.1 产品定位收紧为「音频电台」（删呼吸 + 删氛围视频）；V3.2 卡片视觉重构。</p>
+    </div>
+
+    <div class="stage done">
+      <h4>V4.0 QQ 音乐源 + 听歌画像 <span class="tag done">完成 2026-05-14</span></h4>
+      <div class="when">QQ 音乐适配器（按 songmid 直取）+ 5 年 209 首歌单 + listening_facts 池</div>
+      <p>引入 QQ 作为默认源（VIP 月费覆盖 95%+）；2025 听歌报告深度接入；DeepSeek/MiMo 双 LLM 切换。</p>
+    </div>
+
+    <div class="stage now">
+      <h4>V4.1 打磨 + 发布准备 <span class="tag now">进行中</span></h4>
+      <div class="when">2026-05-15 当天进度 3/5</div>
+      <p>✅ T4.1.5 全项目敏感数据脱敏 · ✅ T4.1.2 配置面板大重构 · ✅ T4.1.1 预制 5 首待播队列</p>
+      <p>⏳ T4.1.3 README + GitHub 发布 · ⏳ T4.1.4 听歌报告多模态识图导入脚本</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<section>
+  <h2><span class="num">06</span>已知阻塞 & 待修</h2>
+  <p class="lede">影响当前体验的活跃问题清单。</p>
+
+  <div class="issues">
+
+    <div class="issue">
+      <h5><span class="id">B003</span>设置中配置的位置不生效</h5>
+      <p>P1 · M6 · 配置 location 后仍显示自动定位结果，必须手动 refetch 才正确。配置保存后未触发位置 state 更新。</p>
+    </div>
+
+    <div class="issue">
+      <h5><span class="id">B004</span>切下一首失败（追查中）</h5>
+      <p>P1 · M4 · 点「下一首」无响应或卡住。已修复 catch else 分支按钮恢复缺失，但宝实测仍切不动；正在加诊断日志定位 startPlayback 哪一步抛错（最可疑：AudioContext 多次创建撞上限 6 个）。</p>
+    </div>
+
+    <div class="issue">
+      <h5><span class="id">B005</span>预留歌曲播放入口未实现</h5>
+      <p>P2 · M4 · 占位状态，需先与所有者对齐功能定义。</p>
+    </div>
+
+    <div class="issue warn">
+      <h5><span class="id">QQ-AUTH</span>QQ 音乐 cookie 失效（invalidq）</h5>
+      <p>非 bug · 5/14 18:11 后 qm_keyst 被腾讯标记失效，CGI 全部 104009。所有 QQ 路径走兜底网易，但网易 vipType=0 大面积 404 → 体验全瘫。需重新登录 QQ 音乐网页版拿新 cookie 更新 config.json。</p>
+    </div>
+
+    <div class="issue info">
+      <h5><span class="id">NETEASE-VIP</span>网易云 vipType=0</h5>
+      <p>非 bug · 网易账号无绿钻，2024+ 版权歌大概率拿不到直链。建议 (a) QQ 复活后由 QQ 主导；(b) 也充网易绿钻；(c) source_overrides.json 手工锁定。</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================================================== -->
+<footer>
+  <div>AI 音乐电台 · 项目所有者 鲁家琪 · 2026-05-15</div>
+  <div class="links" style="margin-top: 12px;">
+    <a href="/">▶ 播放器</a>
+    <span style="color: var(--parchment);">·</span>
+    <a href="/api/v1/episode">/api/v1/episode</a>
+    <span style="color: var(--parchment);">·</span>
+    <a href="/api/v1/voices">/api/v1/voices</a>
+    <span style="color: var(--parchment);">·</span>
+    <a href="/api/v1/modes">/api/v1/modes</a>
+    <span style="color: var(--parchment);">·</span>
+    <a href="/api/v1/config">/api/v1/config</a>
+  </div>
+</footer>
+
+</body>
+</html>
