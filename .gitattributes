@@ -1,0 +1,27 @@
+# ============================================================
+# AI 音乐电台 · Git 属性
+# 统一换行符（根治 Windows 上每次 commit 的 LF→CRLF 警告）+ 二进制标记
+# ============================================================
+
+# 默认：文本文件仓库内统一存 LF，检出也用 LF（现代编辑器均支持）
+* text=auto eol=lf
+
+# Windows 脚本必须保持 CRLF（双击运行依赖）
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件：不做换行符转换、不计入文本 diff
+*.mp3        binary
+*.png        binary
+*.jpg        binary
+*.jpeg       binary
+*.gif        binary
+*.ico        binary
+*.webp       binary
+*.db         binary
+*.sqlite3    binary
+*.woff       binary
+*.woff2      binary
+*.ttf        binary
+*.excalidraw binary
