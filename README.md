@@ -58,7 +58,7 @@ QQ 音乐源依赖第三方服务 [QQMusicApi](https://github.com/luren-dc/QQMus
 ```powershell
 # 在项目根目录
 git clone https://github.com/luren-dc/QQMusicApi third_party/QQMusicApi
-pip install -r third_party/QQMusicApi/requirements.txt   # 具体依赖以其 README 为准
+pip install ./third_party/QQMusicApi   # 从其 pyproject.toml 安装（需 Python ≥ 3.10）
 ```
 
 再把它的配置改成本项目需要的几项 —— 复制 `web/config.example.toml` 为 `web/config.toml`，修改这 4 处：
