@@ -1,60 +1,23 @@
-# QQ 音乐 cookie 获取指南
+# QQ 音乐登录指南（扫码）
 
-> 用途：让 AI 电台后端用你的 QQ 音乐账号取歌曲直链和歌词。**没 cookie 也能跑**，但只能拿到部分歌曲（VIP 歌、特殊版权歌会失败）；填上 cookie 后基本和你在 QQ 音乐 App 里听到的一样。
+> 用途：让 AI 电台用你的 QQ 音乐账号取歌曲直链和歌词。**不登录也能跑**，但只能拿到部分歌曲（VIP 歌、特殊版权歌会失败，自动降级到网易云兜底）；登录后基本和你在 QQ 音乐 App 里听到的一样。
 >
-> 有效期：`qm_keyst` 通常 **30-90 天**。如果某天 AI 电台突然 QQ 源全部失败，多半是 cookie 过期了，重做一次本指南即可。
+> 本项目用**扫码登录** —— 凭据由内置的 QQMusicApi 服务（`:8080`）以 SQLite 管理并自动续期，**扫一次几乎永久有效**（除非腾讯主动踢账号才需重扫）。无需手动复制 cookie。
 
 ---
 
-## 操作步骤（约 5 分钟）
+## 操作步骤（约 1 分钟）
 
-### 1. 浏览器登录 QQ 音乐网页版
+1. 启动电台（双击 `点我启动电台.bat`，或手动起后端 `:8000` + QQMusicApi `:8080`）。
+2. 浏览器打开 **`http://<本机IP>:8000/qq-login.html`**（如 `http://127.0.0.1:8000/qq-login.html`）。
+3. 用**手机 QQ** 扫码确认登录。
+4. 页面提示登录成功、显示你的 musicid 即可。回到播放器，QQ 源就生效了。
 
-打开 https://y.qq.com/ ，右上角点「登录」，用 QQ 扫码或账号密码登录。
-
-> ⚠️ 必须是**网页版**。QQ 音乐 PC 客户端的 cookie 和网页版不通用，本项目只能用网页版的。
-
-### 2. 打开开发者工具
-
-登录成功后**保持当前页面**，按 `F12`（或 `Ctrl+Shift+I`）打开开发者工具。
-
-### 3. 找到 cookies
-
-在开发者工具里切到 **Application** 标签（Chrome / Edge）或 **Storage** 标签（Firefox）：
-
-```
-Application
-  └─ Storage
-      └─ Cookies
-          └─ https://y.qq.com    ← 点这一项
-```
-
-右侧会出现一张表格，每行一个 cookie 字段。
-
-### 4. 复制两个字段的值
-
-在表格里找下面两行，记下 **Value** 列的内容：
-
-| Name | Value（举例，每人不一样） |
-|---|---|
-| `uin` | `o123456789` 或 `123456789` |
-| `qm_keyst` | `W_X_XXXXXXXXXXXXXXXXXXXX...`（一长串） |
-
-> `uin` 前面有时带 `o`，复制时带上没关系，代码会自动剥掉。
-
-### 5. 拼成单串填进配置
-
-把两个值用 `; ` 拼起来，**整体填进 `data/config.json`** 的 `qqmusic_cookie` 字段：
-
-```json
-"qqmusic_cookie": "uin=123456789; qm_keyst=W_X_XXXXXXXXXXXXXXXXXX"
-```
-
-或者打开 AI 电台前端的 ⚙ 配置面板，找到「QQ 音乐」section 填进去保存。
+> 也可以在播放器的 ⚙ 配置面板 →「QQ 音乐」section 点「扫码登录」，打开同一个页面。
 
 ---
 
-## 验证 cookie 有效
+## 验证是否生效
 
 后端启动后调测试接口：
 
@@ -71,28 +34,19 @@ Content-Type: application/json
 {"ok": true, "message": "QQ 音乐连通正常（《xxx》直链 XXX 字符，歌词 XXX 字）"}
 ```
 
-或者直接在浏览器试播：
-
-```
-http://localhost:8000/api/v1/debug/qqmusic?songmid=<some_songmid>&title=<song_title>&artists=<artist>
-```
-
-返回 JSON 里的 `song_url` 直接访问即可听到对应歌曲。
-
 ---
 
 ## 失败排查
 
 | 现象 | 可能原因 | 处理 |
 |---|---|---|
-| `直链 0 字符` / `result=-1` | cookie 没填或填错了 | 重做步骤 1-5，注意复制完整 |
-| `result=2000` 等错误码 | cookie 已过期 | 重新登录网页版再拿一次 |
-| `直链能拿到但下载 502` | VPN 拦了 QQ 音乐域名 | 把 `y.qq.com`、`ws.stream.qqmusic.qq.com`、`dl.stream.qqmusic.qq.com`、`y.gtimg.cn` 加入 VPN direct 名单 |
+| 扫码后状态一直不变 | `:8080` 服务没起来 / 多 worker | 确认 QQMusicApi 服务在跑；`config.toml` 里须 `workers=1`（多 worker 会导致轮询命中不同进程，永远拿不到登录成功事件） |
+| `直链 0 字符` / `result=-1` | 未登录或凭据失效 | 重新打开 `/qq-login.html` 扫码 |
+| 直链能拿到但下载 502 | VPN 拦了 QQ 音乐域名 | 把 `y.qq.com`、`ws.stream.qqmusic.qq.com`、`dl.stream.qqmusic.qq.com`、`y.gtimg.cn` 加入 VPN direct 名单 |
 | 只能拿 128k / 普通音质 | 当前账号不是 QQ 音乐 VIP | 升级 QQ 音乐绿钻；或接受次音质 |
 
 ---
 
 ## 安全提示
 
-`qm_keyst` 等同于你的登录态，**不要分享给别人 / 截图泄露 / 贴公开仓库**。
-本项目 `data/config.json` 默认在 `.gitignore` 里，不会被 git 跟踪。
+登录凭据存在 `:8080` 服务的 `web/data/credentials.sqlite3`（已在 `.gitignore`，不入仓）。**不要分享 / 截图泄露 / 贴到公开仓库。**
