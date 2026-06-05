@@ -57,6 +57,9 @@ MODE_LABELS: dict[str, str] = {
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+# debug 端点开关：默认关；dev 想用 /api/v1/debug/* 时 `set RADIO_DEBUG=1` 再起服务。
+RADIO_DEBUG = os.environ.get("RADIO_DEBUG", "").lower() in ("1", "true", "yes", "on")
+
 
 @asynccontextmanager
 async def lifespan(app):
@@ -83,11 +86,22 @@ async def lifespan(app):
 
 app = FastAPI(title="AI Radio - V2", lifespan=lifespan)
 
+# 显式白名单（呼应 VPN 访问规则）：后端自挂前端 :8000 + dev 端口；LAN 段用 regex 兜任意端口。
+# 本项目无跨站 cookie 需求（QQ 凭据走 :8080 sqlite、网易 cookie 在后端配置），
+# allow_credentials=False 即消除 "*" + credentials 的 CORS 规范冲突。
+_ALLOWED_ORIGINS = [
+    "http://localhost:8000", "http://127.0.0.1:8000",
+    "http://localhost:4321", "http://127.0.0.1:4321",
+    "http://localhost:5173", "http://127.0.0.1:5173",
+]
+_ALLOWED_ORIGIN_REGEX = r"http://(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_origin_regex=_ALLOWED_ORIGIN_REGEX,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -311,6 +325,16 @@ def _track_not_found(entry: PlaylistEntry, message: str, suggestion: str) -> JSO
 
 
 # === 路由 ===
+def _probe_qqmusic_api(timeout: float = 1.0) -> dict:
+    """探 QQMusicApi :8080 是否在跑（QQ 直链 / 歌词 / 扫码登录的唯一来源）。
+    短超时 + trust_env=False（不走 VPN 代理），失败不抛、不拖慢 health。"""
+    try:
+        r = httpx.get(f"{qqmusic.QQ_API_BASE}/", timeout=timeout, trust_env=False)
+        return {"alive": True, "status": r.status_code}
+    except Exception as e:
+        return {"alive": False, "error": type(e).__name__}
+
+
 @app.get("/api/v1/health")
 def health():
     playlist = load_playlist()
@@ -323,6 +347,7 @@ def health():
         "song_cache_dir": str(SONG_CACHE_DIR),
         "tts_cache_dir": str(TTS_CACHE_DIR),
         "cursor": _cursor["i"],
+        "qqmusic_api": _probe_qqmusic_api(),
     }
 
 
@@ -580,6 +605,8 @@ def debug_qqmusic_track(
     示例：/api/v1/debug/qqmusic?songmid=000XeLXA3X8CTH&title=后来&artists=刘若英
           &album=我等你&album_mid=0017zqT34WuQwa&duration_ms=341000
     """
+    if not RADIO_DEBUG:
+        raise HTTPException(404, "debug endpoint disabled")
     artist_list = [a.strip() for a in artists.split(",") if a.strip()]
     track = qqmusic.get_track_by_songmid(
         songmid,
@@ -688,13 +715,12 @@ _SENSITIVE_KEYS = {
     "mimo_api_key",
     "deepseek_api_key",
     "netease_music_u_cookie",
-    "qqmusic_cookie",
     "qweather_api_key",
 }
 # 首启判定的必填字段：LLM key 按当前 provider 动态决定，netease cookie 恒定必填
 _BASE_REQUIRED_KEYS = ["netease_music_u_cookie"]
 # 可选凭据：含所有 LLM provider 的 key（每个都允许填，但不强制）
-_OPTIONAL_KEYS = ["fish_audio_api_key", "voice_id", "qqmusic_cookie", "qweather_api_key"]
+_OPTIONAL_KEYS = ["fish_audio_api_key", "voice_id", "qweather_api_key"]
 
 
 def _current_required_keys() -> list[str]:
@@ -766,6 +792,10 @@ def update_config_endpoint(payload: ConfigUpdatePayload):
     CONFIG_PATH.write_text(
         json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+    # 热更新：netease cookie 变了就让已登录 session 失效，下次取歌自动重登（免重启）
+    if new_creds.get("netease_music_u_cookie", "").strip():
+        netease.reset_login()
+        logger.info("netease cookie 已更新 → reset_login")
     logger.info(
         f"配置已更新：credentials={list(new_creds.keys())} settings={list(new_settings.keys())}"
     )

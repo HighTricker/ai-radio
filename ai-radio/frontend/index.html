@@ -310,13 +310,6 @@
       font-weight: normal;
       letter-spacing: 0.04em;
     }
-    /* 海报作为可点击入口 */
-    .pb-poster {
-      cursor: pointer;
-      transition: transform 0.15s;
-    }
-    .pb-poster:hover { transform: scale(1.04); }
-    .pb-poster:active { transform: scale(0.96); }
     @media (max-width: 720px) {
       .lyric-sheet {
         bottom: calc(80px + 12px + 8px);
@@ -524,7 +517,6 @@
       .toast-stack {
         bottom: calc(80px + 12px + 0.6rem);
       }
-      .pb-poster { width: 44px; height: 44px; }
       .pb-title { max-width: 100%; }
       .pb-artist { display: none; }
       .pb-feedback { gap: 0.2rem; }
@@ -959,10 +951,6 @@
     </footer>
   </main>
 
-  <!-- 旧 JS 引用兼容（隐藏占位） -->
-  <div id="pbPoster" style="display:none"></div>
-  <button id="lyricSheetClose" style="display:none" aria-hidden="true"></button>
-
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
   <!-- === 配置覆盖层（modal） === -->
@@ -1135,7 +1123,6 @@
     const prevBtn = $('prevBtn');
     const likeBtn = $('likeBtn');
     const dislikeBtn = $('dislikeBtn');
-    const pbPoster = $('pbPoster');
     const pbTitle = $('pbTitle');
     const pbArtist = $('pbArtist');
     const pbIconPlay = $('pbIconPlay');
@@ -1145,7 +1132,6 @@
     const pbProgressThumb = $('pbProgressThumb');
     const toastStack = $('toastStack');
     const lyricSheet = $('lyricSheet');
-    const lyricSheetClose = $('lyricSheetClose');
     const lyricSheetContent = $('lyricSheetContent');
     const lyricEmpty = $('lyricEmpty');
     const lyricNarrationWrap = $('lyricNarrationWrap');
@@ -1292,16 +1278,6 @@
       if (pbModeEl) {
         const m = ep.mode || currentMode || 'song_intro';
         pbModeEl.textContent = MODE_LABELS_ZH[m] || m;
-      }
-      if (ep.cover_url) {
-        pbPoster.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = ep.cover_url;
-        img.alt = ep.song_title || '';
-        img.onerror = () => { pbPoster.innerHTML = '<span class="placeholder">♪</span>'; };
-        pbPoster.appendChild(img);
-      } else {
-        pbPoster.innerHTML = '<span class="placeholder">♪</span>';
       }
       renderLyricSheet(ep);
     }
@@ -1507,7 +1483,6 @@
     }
 
     async function startPlayback(direction = 'next') {
-      console.log('[B004-diag] startPlayback called, direction=', direction);
       clearError();
       if (autoNextTimer) { clearInterval(autoNextTimer); autoNextTimer = null; }
       playPauseBtn.disabled = true;
@@ -1515,9 +1490,7 @@
 
       try {
         const ep = await fetchEpisode(direction);
-        console.log('[B004-diag] episode 200, payload:', { song_title: ep.song_title, hasTts: !!ep.tts_url, song_url: ep.song_url, tts_url: ep.tts_url, lyric_len: (ep.lyric||'').length, script_len: (ep.script||'').length });
         setMeta(ep);
-        console.log('[B004-diag] setMeta done');
 
         const hasTts = !!ep.tts_url;
         const degradedStages = (ep.degraded || []).map(d => d.stage);
@@ -1525,7 +1498,6 @@
 
         setStatus(hasTts ? 'AI 主播准备中…' : '准备播放（无旁白）…');
         ctx = new (window.AudioContext || window.webkitAudioContext)();
-        console.log('[B004-diag] AudioContext created, state=', ctx.state);
 
         let ttsBuf = null;
         let songBuf;
@@ -1537,7 +1509,6 @@
         } else {
           songBuf = await loadAudio(ep.song_url);
         }
-        console.log('[B004-diag] loadAudio done, ttsDur=', ttsBuf ? ttsBuf.duration : 0, 'songDur=', songBuf.duration);
         const ttsDur = hasTts ? ttsBuf.duration : 0;
 
         // === DJ 时间对齐：用 LRC 第一句真歌词时间戳跳过前奏 ===
@@ -1997,8 +1968,6 @@
     dislikeBtn.addEventListener('click', () => sendFeedback('dislike'));
 
     // 进度条拖拽（鼠标 + 触屏）
-    // 旧弹层逻辑已废弃（打字机风把歌词直接做进主区，不再点海报弹出）
-
     pbProgressBar.addEventListener('mousedown', onProgressDown);
     window.addEventListener('mousemove', onProgressMove);
     window.addEventListener('mouseup', onProgressUp);

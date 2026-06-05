@@ -1,4 +1,5 @@
 """配置文件读取（data/config.json）"""
+import copy
 import json
 from pathlib import Path
 
@@ -6,13 +7,31 @@ from pathlib import Path
 AI_RADIO_DIR = Path(__file__).resolve().parent.parent.parent
 CONFIG_PATH = AI_RADIO_DIR / "data" / "config.json"
 
+# 进程内缓存 + 文件 mtime 失效：一次 episode 请求会重复读 config 十几次，缓存掉重复读盘；
+# 配置面板写盘后 mtime 变 → 下次自动重载（无需重启，与 update_config 的「改完即生效」协同）。
+_CONFIG_CACHE: dict | None = None
+_CONFIG_MTIME: float | None = None
+
 
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(
             f"配置文件不存在：{CONFIG_PATH}。请按 PRD 创建并填入 API key。"
         )
-    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    global _CONFIG_CACHE, _CONFIG_MTIME
+    mtime = CONFIG_PATH.stat().st_mtime
+    if _CONFIG_CACHE is None or _CONFIG_MTIME != mtime:
+        _CONFIG_CACHE = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        _CONFIG_MTIME = mtime
+    # 返回深拷贝：update_config 会就地 mutate 返回的 dict，绝不能污染缓存
+    return copy.deepcopy(_CONFIG_CACHE)
+
+
+def reset_config_cache() -> None:
+    """测试 / 手动失效缓存用。"""
+    global _CONFIG_CACHE, _CONFIG_MTIME
+    _CONFIG_CACHE = None
+    _CONFIG_MTIME = None
 
 
 def get_credential(key: str) -> str:

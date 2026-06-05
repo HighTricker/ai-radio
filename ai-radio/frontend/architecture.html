@@ -408,8 +408,8 @@
   <h1>懂你的私人电台</h1>
   <p class="subtitle">AI 主播 + 听歌画像 + 真实音乐 API，按心情/天气/今天写旁白，渐进式播放歌曲。</p>
   <div class="meta">
-    <span>当前阶段 · <b>V4.1 · 打磨发布</b></span>
-    <span>歌单规模 · <b>173 首</b>（5 年合并去重）</span>
+    <span>当前阶段 · <b>已开源发布</b></span>
+    <span>歌单规模 · <b>179 首</b>（多年合并去重）</span>
     <span>项目所有者 · <b>HighTricker</b></span>
   </div>
 </div>
@@ -641,7 +641,7 @@
     <div class="module">
       <h4><span class="badge">M5</span>UI</h4>
       <div class="files">frontend/index.html（CSS + DOM）</div>
-      <p class="desc">极简底栏播放器 + 流动歌词卡片 + 配置面板 + 萤火虫粒子。Superhuman 视觉系统（Mysteria Purple + Lavender + 霞鹜文楷）。V3.1 后已删氛围视频/呼吸效果，纯音频体验。</p>
+      <p class="desc">极简底栏播放器 + 流动歌词卡片 + 配置面板 + 萤火虫粒子。深紫光斑暗色终端风（漂浮光斑 + 鼠标萤火虫粒子 + 霞鹜文楷 + 等宽终端排版）。V3.1 后已删氛围视频/呼吸效果，纯音频体验。</p>
     </div>
 
     <div class="module">
@@ -722,7 +722,7 @@
 <!-- ===================================================== -->
 <section>
   <h2><span class="num">05</span>阶段进度</h2>
-  <p class="lede">从 V1 端到端打通，到 V4.1 准备开源。当前在 V4.1 打磨发布最后冲刺。</p>
+  <p class="lede">从 V1 端到端打通，到公开发布。已开源至 GitHub（github.com/HighTricker/ai-radio）。</p>
 
   <div class="timeline">
 
@@ -735,7 +735,7 @@
     <div class="stage done">
       <h4>V2 真实音乐 + 视觉重构 <span class="tag done">完成 2026-04-30</span></h4>
       <div class="when">网易云 + LRC + DJ 时间对齐 + LLM 自动改写 + 多音色 + Superhuman 视觉</div>
-      <p>从「本地歌」到「真实曲库」+ 完整播放页 UI（海报、流动歌词、卡拉 OK 高亮）。</p>
+      <p>从「本地歌」到「真实曲库」+ 完整播放页 UI（流动歌词、卡拉 OK 高亮）。</p>
     </div>
 
     <div class="stage done">
@@ -746,15 +746,15 @@
 
     <div class="stage done">
       <h4>V4.0 QQ 音乐源 + 听歌画像 <span class="tag done">完成 2026-05-14</span></h4>
-      <div class="when">QQ 音乐适配器（按 songmid 直取）+ 5 年 209 首歌单 + listening_facts 池</div>
+      <div class="when">QQ 音乐适配器（按 songmid 直取）+ 多年合并歌单 + listening_facts 池</div>
       <p>引入 QQ 作为默认源（VIP 月费覆盖 95%+）；2025 听歌报告深度接入；DeepSeek/MiMo 双 LLM 切换。</p>
     </div>
 
-    <div class="stage now">
-      <h4>V4.1 打磨 + 发布准备 <span class="tag now">进行中</span></h4>
-      <div class="when">2026-05-15 当天进度 3/5</div>
-      <p>✅ T4.1.5 全项目敏感数据脱敏 · ✅ T4.1.2 配置面板大重构 · ✅ T4.1.1 预制 5 首待播队列</p>
-      <p>⏳ T4.1.3 README + GitHub 发布 · ⏳ T4.1.4 听歌报告多模态识图导入脚本</p>
+    <div class="stage done">
+      <h4>V4.1 / V4.2 打磨 + 公开发布 <span class="tag done">完成 2026-06-05</span></h4>
+      <div class="when">多年画像（2018-2022 + 2025）+ 公开发布 GitHub</div>
+      <p>✅ 全项目脱敏 · ✅ 配置面板重构 · ✅ 预制 5 首待播队列 · ✅ README + GitHub 公开发布</p>
+      <p>✅ listening_facts 多年画像（跨年钩子）· 听歌报告导入改为「放截图 + 大模型识别」工作流</p>
     </div>
 
   </div>
@@ -773,8 +773,8 @@
     </div>
 
     <div class="issue">
-      <h5><span class="id">B004</span>切下一首失败（追查中）</h5>
-      <p>P1 · M4 · 点「下一首」无响应或卡住。已修复 catch else 分支按钮恢复缺失，但宝实测仍切不动；正在加诊断日志定位 startPlayback 哪一步抛错（最可疑：AudioContext 多次创建撞上限 6 个）。</p>
+      <h5><span class="id">B004</span>切下一首失败（✅ 已修复）</h5>
+      <p>P1 · M4 · 点「下一首」无响应。根因：startPlayback catch 的 else 分支漏了恢复 nextBtn/prevBtn，已补齐；定位用的诊断日志已清理。</p>
     </div>
 
     <div class="issue">
@@ -797,7 +797,7 @@
 
 <!-- ===================================================== -->
 <footer>
-  <div>AI 音乐电台 · 项目所有者 HighTricker · 2026-05-15</div>
+  <div>AI 音乐电台 · 项目所有者 HighTricker · 2026-06-05</div>
   <div class="links" style="margin-top: 12px;">
     <a href="/">▶ 播放器</a>
     <span style="color: var(--parchment);">·</span>
