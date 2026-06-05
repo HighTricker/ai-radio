@@ -565,7 +565,7 @@
       <div class="flow-body">
         <strong>稿件：手写优先 → LLM 自动生成</strong>
         <code>llm._read_or_generate_script(entry, lyric, mode, environment)</code>
-        <div class="note">先查 <code>data/notes/scripts/&lt;歌名&gt;.md</code> 手写稿；没有则按 mode 调 LLM（song_intro / classic_prose / history_today / quotation / weather_mood），生成后落盘做缓存。</div>
+        <div class="note">先查 <code>data/notes/scripts/&lt;歌名&gt;.md</code> 手写稿；没有则按 mode 调 LLM（song_intro / song_intro_taste / weather_mood），生成后落盘做缓存。</div>
       </div>
     </div>
 
@@ -629,7 +629,7 @@
     <div class="module">
       <h4><span class="badge">M3</span>文案 & TTS</h4>
       <div class="files">services/llm.py · llm_providers.py · fish_audio.py · listening_facts.py · facts.py</div>
-      <p class="desc">5 种 mode（song_intro / classic_prose / history_today / quotation / weather_mood）+ DeepSeek/MiMo 双 LLM provider 切换。Fish Audio TTS 按 hash 缓存。listening_facts 池注入「你的偏好」。</p>
+      <p class="desc">3 种 mode（song_intro 纯介绍 / song_intro_taste 结合听歌史 / weather_mood 天气）+ DeepSeek/MiMo 双 LLM provider 切换。Fish Audio TTS 按 hash 缓存。listening_facts 池注入「你的偏好」。</p>
     </div>
 
     <div class="module">
