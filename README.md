@@ -169,6 +169,8 @@ cd third_party/QQMusicApi
 | `netease_music_u_cookie` | 兜底音源 | 浏览器登录网易云后取 `MUSIC_U` cookie |
 | QQ 音乐 | 主音源 | **无需填 cookie**，启动后 `/qq-login.html` 扫码 |
 
+> **模型名**：`settings.llm_model` 默认填 `deepseek-v4-pro`；若你的 DeepSeek 账号未开通该模型，改成通用的 `deepseek-chat` 即可（留空也会自动走 `deepseek-chat`）。
+
 > 建议保持 QQ 音乐绿钻（VIP）有效以获得高音质直链；非 VIP 会自动降级到网易云兜底（覆盖率约 70–80%）。
 
 ---
