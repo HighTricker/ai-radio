@@ -1,4 +1,4 @@
-"""LLM 主播稿生成（OpenAI 兼容协议，可在 MiMo / DeepSeek 等 provider 间切换）
+"""LLM 主播稿生成（DeepSeek，OpenAI 兼容协议）
 
 provider 选择由 settings.llm_provider 决定，模型名由 settings.llm_model 决定
 （缺省走 PROVIDERS 配置里的 default_model）；详见 services/llm_providers.py。

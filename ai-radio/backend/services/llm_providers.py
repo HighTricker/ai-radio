@@ -1,7 +1,7 @@
-"""LLM provider 抽象层：让 llm.py / recommender.py 自由切换 MiMo / DeepSeek 等 OpenAI 兼容服务。
+"""LLM provider 抽象层：基于 OpenAI 兼容协议封装 DeepSeek 写稿服务。
 
-为什么不直接硬编码：
-- 用户在前端可以输 apikey 任意切换 provider
+为什么保留抽象层：
+- 用户在前端可以输 apikey
 - 未来加 OpenAI / Qwen / GLM 等只需往 PROVIDERS 加一条
 - llm.py 和 recommender.py 不再重复 base_url / default_model 常量
 """
@@ -11,12 +11,6 @@ from .config import get_credential, load_config
 
 # provider_id → 配置；新增 provider 直接在这里加一行
 PROVIDERS: dict[str, dict] = {
-    "mimo": {
-        "label": "MiMo",
-        "base_url": "https://api.xiaomimimo.com/v1",
-        "api_key_field": "mimo_api_key",
-        "default_model": "mimo-v2-flash",
-    },
     "deepseek": {
         "label": "DeepSeek",
         "base_url": "https://api.deepseek.com/v1",
@@ -25,11 +19,11 @@ PROVIDERS: dict[str, dict] = {
     },
 }
 
-DEFAULT_PROVIDER = "mimo"
+DEFAULT_PROVIDER = "deepseek"
 
 
 def get_current_provider() -> str:
-    """从 config.settings.llm_provider 读当前 provider；未配置或无效值 → 兜底 mimo。"""
+    """从 config.settings.llm_provider 读当前 provider；未配置或无效值 → 兜底 deepseek。"""
     cfg = load_config()
     p = (cfg.get("settings", {}) or {}).get("llm_provider")
     if isinstance(p, str) and p in PROVIDERS:

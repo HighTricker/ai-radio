@@ -38,8 +38,11 @@ def _qweather_host() -> str:
     except Exception:
         return DEFAULT_QWEATHER_HOST
     h = (cfg.get("credentials", {}) or {}).get("qweather_api_host", "")
-    if isinstance(h, str) and h.strip():
-        return h.strip().replace("https://", "").replace("http://", "").rstrip("/")
+    if isinstance(h, str):
+        h = h.strip()
+        # 跳过 example 模板里未替换的占位符（请在此填入… / <…>），回退默认 host
+        if h and not h.startswith("请") and not h.startswith("<"):
+            return h.replace("https://", "").replace("http://", "").rstrip("/")
     return DEFAULT_QWEATHER_HOST
 
 

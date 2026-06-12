@@ -451,7 +451,7 @@
         <span class="chip">prewarm.py · 5 首预热队列（线程 + Lock）</span>
         <span class="chip">recommender.py · LLM 选歌 + 反馈过滤</span>
         <span class="chip">llm.py · 多 mode 写稿调度</span>
-        <span class="chip">llm_providers.py · MiMo / DeepSeek 双源</span>
+        <span class="chip">llm_providers.py · DeepSeek</span>
         <span class="chip">fish_audio.py · TTS 合成 + 缓存</span>
         <span class="chip">song_cache.py · 歌曲本地下载</span>
         <span class="chip">environment.py · 地理 + 天气</span>
@@ -486,8 +486,7 @@
     <div class="layer l-external">
       <div class="label">外部依赖<small>EXTERNAL APIs</small></div>
       <div class="modules">
-        <span class="chip ext">DeepSeek API · LLM 写稿（主）</span>
-        <span class="chip ext">小米 MiMo API · LLM 写稿（备）</span>
+        <span class="chip ext">DeepSeek API · LLM 写稿</span>
         <span class="chip ext">Fish Audio · 中文 TTS</span>
         <span class="chip ext">QQ 音乐 CGI（qqmusic-api-python）</span>
         <span class="chip ext">网易云 API（pyncm）</span>
@@ -629,7 +628,7 @@
     <div class="module">
       <h4><span class="badge">M3</span>文案 & TTS</h4>
       <div class="files">services/llm.py · llm_providers.py · fish_audio.py · listening_facts.py · facts.py</div>
-      <p class="desc">3 种 mode（song_intro 纯介绍 / song_intro_taste 结合听歌史 / weather_mood 天气）+ DeepSeek/MiMo 双 LLM provider 切换。Fish Audio TTS 按 hash 缓存。listening_facts 池注入「你的偏好」。</p>
+      <p class="desc">3 种 mode（song_intro 纯介绍 / song_intro_taste 结合听歌史 / weather_mood 天气）+ DeepSeek LLM 写稿。Fish Audio TTS 按 hash 缓存。listening_facts 池注入「你的偏好」。</p>
     </div>
 
     <div class="module">
@@ -681,12 +680,6 @@
       <div class="status ok">健康</div>
     </div>
 
-    <div class="dep">
-      <div class="icon">🤖</div>
-      <div class="name">小米 MiMo</div>
-      <div class="role">LLM 备 · 写稿 5s</div>
-      <div class="status ok">健康</div>
-    </div>
 
     <div class="dep">
       <div class="icon">🎙️</div>
@@ -747,7 +740,7 @@
     <div class="stage done">
       <h4>V4.0 QQ 音乐源 + 听歌画像 <span class="tag done">完成 2026-05-14</span></h4>
       <div class="when">QQ 音乐适配器（按 songmid 直取）+ 多年合并歌单 + listening_facts 池</div>
-      <p>引入 QQ 作为默认源（VIP 月费覆盖 95%+）；2025 听歌报告深度接入；DeepSeek/MiMo 双 LLM 切换。</p>
+      <p>引入 QQ 作为默认源（VIP 月费覆盖 95%+）；2025 听歌报告深度接入；DeepSeek LLM 写稿。</p>
     </div>
 
     <div class="stage done">

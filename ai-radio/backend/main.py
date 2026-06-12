@@ -522,7 +522,7 @@ def get_episode(
             "直链可能已过期或网络断了，自动切下一首…",
         )
 
-    # 3. 读旁白稿：优先本地手写稿；找不到则按 mode 调小米 MiMo LLM 自动生成 + 落盘
+    # 3. 读旁白稿：优先本地手写稿；找不到则按 mode 调 DeepSeek LLM 自动生成 + 落盘
     #    weather_mood 模式：拉一次环境（命中缓存通常 < 5ms）作为 LLM 事实素材
     env_data: dict | None = None
     if mode == "weather_mood":
@@ -710,11 +710,21 @@ def get_feedback_stats():
 _SENSITIVE_KEYS = {
     "fish_audio_api_key",
     "voice_id",
-    "mimo_api_key",
     "deepseek_api_key",
     "netease_music_u_cookie",
     "qweather_api_key",
 }
+
+# 占位符前缀：example 模板里未替换的字段以这些开头，应判为「未填」而非真值
+_PLACEHOLDER_PREFIXES = ("请在此填入", "<")
+
+
+def _is_real_value(v) -> bool:
+    """非空且不是 example 占位符 → 视为用户真正填了值。"""
+    if not isinstance(v, str):
+        return False
+    s = v.strip()
+    return bool(s) and not s.startswith(_PLACEHOLDER_PREFIXES)
 # 首启判定的必填字段：LLM key 按当前 provider 动态决定，netease cookie 恒定必填
 _BASE_REQUIRED_KEYS = ["netease_music_u_cookie"]
 # 可选凭据：含所有 LLM provider 的 key（每个都允许填，但不强制）
@@ -727,7 +737,7 @@ def _current_required_keys() -> list[str]:
     try:
         return [get_required_api_key_field(), *_BASE_REQUIRED_KEYS]
     except Exception:
-        return ["mimo_api_key", *_BASE_REQUIRED_KEYS]
+        return ["deepseek_api_key", *_BASE_REQUIRED_KEYS]
 
 
 def _mask_value(v: str) -> str:
@@ -752,8 +762,8 @@ def get_config_endpoint():
         else:
             masked[k] = v
     required_keys = _current_required_keys()
-    required_filled = {k: bool((creds.get(k) or "").strip()) for k in required_keys}
-    optional_filled = {k: bool((creds.get(k) or "").strip()) for k in _OPTIONAL_KEYS}
+    required_filled = {k: _is_real_value(creds.get(k)) for k in required_keys}
+    optional_filled = {k: _is_real_value(creds.get(k)) for k in _OPTIONAL_KEYS}
     return {
         "credentials": masked,
         "settings": cfg.get("settings", {}) or {},
@@ -830,7 +840,7 @@ def search_location_endpoint(payload: LocationSearchPayload):
 
 
 class ConfigTestPayload(BaseModel):
-    service: str = Field(..., pattern="^(llm|mimo|deepseek|fish_audio|netease|qqmusic|qweather)$")
+    service: str = Field(..., pattern="^(llm|deepseek|fish_audio|netease|qqmusic|qweather)$")
     provider: str | None = None  # 仅 service=llm 时生效；缺省走当前 settings.llm_provider
 
 
@@ -838,16 +848,16 @@ class ConfigTestPayload(BaseModel):
 def test_config_endpoint(payload: ConfigTestPayload):
     """连通性测试：调一次目标服务最小可用请求。
 
-    LLM 测试：service 可填 llm（通用）或 mimo / deepseek（指定 provider）。
+    LLM 测试：service 可填 llm（通用）或 deepseek（指定 provider）。
     传 provider 时强制用该 provider 临测（不改全局 settings.llm_provider）。
     """
     service = payload.service
     try:
-        if service in ("llm", "mimo", "deepseek"):
+        if service in ("llm", "deepseek"):
             from services.llm_providers import build_client_and_model, get_provider_config
-            # service=mimo/deepseek → 锁定对应 provider；service=llm → 用 payload.provider 或当前
+            # service=deepseek → 锁定对应 provider；service=llm → 用 payload.provider 或当前
             provider = payload.provider
-            if service in ("mimo", "deepseek"):
+            if service == "deepseek":
                 provider = service
             client, model = build_client_and_model(provider=provider)
             label = get_provider_config(provider)["label"]

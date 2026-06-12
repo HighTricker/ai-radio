@@ -6,3 +6,10 @@ openai>=1.50.0
 qqmusic-api-python>=0.6.0
 pyyaml>=6.0
 requests>=2.31.0
+
+# QQ 音乐 web 服务（third_party/QQMusicApi 的 :8080）所需依赖。
+# 上游把它们放在 pyproject 的 PEP 735 [dependency-groups].web 里，
+# 普通 `pip install ./third_party/QQMusicApi` 不会装到，故在此显式补齐（两服务共用同一 .venv）。
+loguru>=0.7.3
+pydantic-settings[toml]>=2.14.0
+griffe>=2.0.2

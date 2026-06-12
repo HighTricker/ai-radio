@@ -963,27 +963,15 @@
 
       <section class="config-section">
         <h3>大模型 API <span class="config-required">必填</span></h3>
-        <p class="config-hint">用于 AI 主播写旁白稿。支持 OpenAI 兼容协议多源切换（当前可选 MiMo / DeepSeek）。当前 provider 对应的 API KEY 必填，其他可选保存以便随时切换。</p>
+        <p class="config-hint">用于 AI 主播写旁白稿，由 DeepSeek（OpenAI 兼容协议）生成。填入下方 DeepSeek API KEY 即可；模型名留空走默认 deepseek-chat。</p>
+        <input type="hidden" id="cfg-llm-provider" value="deepseek">
         <div class="config-field">
-          <label>当前 PROVIDER / 模型名</label>
+          <label>DeepSeek 模型名</label>
           <div class="config-input-row">
-            <select id="cfg-llm-provider" class="config-input" style="max-width: 140px">
-              <option value="mimo">MiMo（小米）</option>
-              <option value="deepseek">DeepSeek</option>
-            </select>
-            <input type="text" id="cfg-llm-model" placeholder="留空走默认 (mimo-v2-flash)" class="config-input" style="flex:1">
+            <input type="text" id="cfg-llm-model" placeholder="留空走默认 (deepseek-chat)" class="config-input" style="flex:1">
             <button class="config-btn primary" id="cfg-llm-settings-save">保存</button>
           </div>
           <div class="config-test-result" data-result="llm_settings"></div>
-        </div>
-        <div class="config-field">
-          <label>MiMo API KEY</label>
-          <div class="config-input-row">
-            <input type="text" id="cfg-mimo-input" placeholder="sk-..." class="config-input masked" readonly>
-            <button class="config-btn" data-edit="cfg-mimo-input">编辑</button>
-            <button class="config-btn primary" data-save="mimo_api_key" data-test="mimo">保存测试</button>
-          </div>
-          <div class="config-test-result" data-result="mimo"></div>
         </div>
         <div class="config-field">
           <label>DeepSeek API KEY</label>
@@ -1980,7 +1968,6 @@
     const configRequiredHint = $('configRequiredHint');
     const settingsTrigger = $('settingsTrigger');
     const cfgInputs = {
-      mimo_api_key: $('cfg-mimo-input'),
       deepseek_api_key: $('cfg-deepseek-input'),
       netease_music_u_cookie: $('cfg-netease-input'),
       fish_audio_api_key: $('cfg-fish-input'),
@@ -1988,7 +1975,6 @@
       qweather_api_key: $('cfg-qweather-input'),
     };
     const cfgResults = {
-      mimo: document.querySelector('[data-result="mimo"]'),
       deepseek: document.querySelector('[data-result="deepseek"]'),
       llm_settings: document.querySelector('[data-result="llm_settings"]'),
       netease: document.querySelector('[data-result="netease"]'),
@@ -1996,9 +1982,8 @@
       qweather: document.querySelector('[data-result="qweather"]'),
     };
 
-    // 各 provider 的默认模型名（前端硬编码与后端 PROVIDERS dict 对齐；切换时刷 placeholder）
+    // provider 默认模型名（前端与后端 PROVIDERS dict 对齐）
     const LLM_PROVIDER_DEFAULTS = {
-      mimo: 'mimo-v2-flash',
       deepseek: 'deepseek-chat',
     };
 
@@ -2019,7 +2004,7 @@
         const modelInput = $('cfg-llm-model');
         if (providerSel && modelInput) {
           const p = settings.llm_provider && LLM_PROVIDER_DEFAULTS[settings.llm_provider]
-            ? settings.llm_provider : 'mimo';
+            ? settings.llm_provider : 'deepseek';
           providerSel.value = p;
           modelInput.value = settings.llm_model || '';
           modelInput.placeholder = `留空走默认 (${LLM_PROVIDER_DEFAULTS[p]})`;
@@ -2265,17 +2250,11 @@
       btn.addEventListener('click', () => cfgSaveAndTest(saveKey, service));
     });
 
-    // V4.0：LLM provider 切换 → 刷新模型名 placeholder；模型名只是提示，未输入则后端走默认
+    // provider 固定 deepseek（隐藏 input），模型名只是提示，未输入则后端走默认
     const cfgLlmProvider = $('cfg-llm-provider');
     const cfgLlmModel = $('cfg-llm-model');
-    if (cfgLlmProvider && cfgLlmModel) {
-      cfgLlmProvider.addEventListener('change', () => {
-        const p = cfgLlmProvider.value;
-        cfgLlmModel.placeholder = `留空走默认 (${LLM_PROVIDER_DEFAULTS[p] || ''})`;
-      });
-    }
 
-    // V4.0：保存 LLM provider + 模型名到 settings（不是 credentials）
+    // 保存 LLM provider + 模型名到 settings（不是 credentials）
     const cfgLlmSettingsSave = $('cfg-llm-settings-save');
     if (cfgLlmSettingsSave) {
       cfgLlmSettingsSave.addEventListener('click', async () => {
@@ -2290,7 +2269,7 @@
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           await loadConfigState();
-          const label = provider === 'deepseek' ? 'DeepSeek' : 'MiMo';
+          const label = 'DeepSeek';
           const modelShown = model || LLM_PROVIDER_DEFAULTS[provider];
           setCfgResult('llm_settings', true, `已切到 ${label} / ${modelShown}`);
         } catch (e) {

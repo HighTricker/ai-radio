@@ -1,13 +1,15 @@
 # QQ 音乐 {year} 年度听歌报告样板（example · listening_facts 池字段全集）
 
-> **本文件是占位样板**，展示一份由 `scripts/import_listening_report.py`（T4.1.4 多模态识图脚本）从 QQ 年度报告截图导出的完整 yaml。
-> 实际使用：把你自己的 22 张 QQ 音乐年度报告截图（qq_1.jpg ~ qq_22.jpg）放到 `年度报告截图/{year}/` 下，跑识图脚本会自动覆盖产出本文件结构。
-> 后端 `backend/services/listening_facts.py` 会读取本文件喂给 LLM 主播作为旁白素材。
+> **本文件是占位样板**，展示一份 listening_facts 池所需的完整 yaml 结构。
+> 实际使用（无需任何脚本）：把你自己各年的 QQ 音乐年度听歌报告**截图**发给一个多模态大模型（如 Claude），让它**按本文件的字段结构**识别成 `.md`。详见项目根 README「接入你自己的听歌画像」。
+> 后端 `backend/services/listening_facts.py` 会读取该文件喂给 LLM 主播作为旁白素材。
+>
+> **落地时**：把整个 `年度报告截图.example/` 目录复制为 `年度报告截图/`，并去掉文件名里的 `.example` 后缀（后端扫描的是 `年度报告截图/{year}/qq_music_{year}年度听歌报告.md`，不带 `.example`）。
 >
 > 字段含义见每行注释。**截图缺失对应模块时，请把字段值留 `null` 而非编造**。
 
-> 来源：QQ 音乐 App 内截图（22 张，qq_1.jpg ~ qq_22.jpg）
-> 提取方式：多模态识别（用户配置的视觉模型）
+> 来源：QQ 音乐 App 内年度听歌报告截图
+> 提取方式：多模态大模型识别（如 Claude）
 > 用户：<your_qq_music_username>
 > 报告主题：<your_yearly_theme>          # 例如「时空韧性的修复者」，每人每年不同
 > 抓取时间：YYYY-MM-DD

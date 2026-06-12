@@ -42,6 +42,22 @@ CLAUDE.local.md
 
 third_party/QQMusicApi/
 
+# ----- 发布清理：本地保留、不入仓的开发产物（含硬编码个人路径 / 噪音） -----
+
+# 迭代期一次性探针 / 校验脚本（多数硬编码本机绝对路径）
+ai-radio/scripts/probe_*.py
+ai-radio/scripts/verify_*.py
+third_party/probe_*.py
+# 由 _launcher.ps1 按当前路径动态生成的服务启动脚本（无需入仓）
+_run-backend.bat
+_run-qqmusic.bat
+# 个人 /bug 工作流 skill（引用不开源的 开发文件/）
+.claude/skills/bug/
+# 早期前端 UI 试验稿
+ai-radio/frontend/demos/
+# 本地生成的项目体检报告（个人查看用，不入仓）
+项目可用性体检报告.html
+
 # ----- 测试素材（含版权音频 / 个人测试内容） -----
 
 测试文件/
