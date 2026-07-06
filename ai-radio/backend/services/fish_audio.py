@@ -10,6 +10,7 @@ from pathlib import Path
 import httpx
 
 from .config import get_credential
+from .tts_text import normalize_for_tts
 
 AI_RADIO_DIR = Path(__file__).resolve().parent.parent.parent
 TTS_CACHE_DIR = AI_RADIO_DIR / "data" / "cache" / "tts"
@@ -32,6 +33,10 @@ def synthesize(text: str, voice_id: str | None = None) -> Path:
 
     voice_id: 可选；不传则用 config.json 的默认 voice_id。
     """
+    # 朗读净化：年份逐字化等（显示用文本不经过这里，仍是阿拉伯数字）。
+    # 放在 hash 之前，缓存 key 按净化后文本算，天然一致、不串音。
+    text = normalize_for_tts(text)
+
     api_key = get_credential("fish_audio_api_key")
     if not voice_id:
         voice_id = get_credential("voice_id")
