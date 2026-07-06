@@ -20,6 +20,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .config import load_config
+
 logger = logging.getLogger(__name__)
 
 AI_RADIO_DIR = Path(__file__).resolve().parent.parent.parent
@@ -86,7 +88,6 @@ def _parse_taste_md() -> list[PlaylistEntry]:
 def _should_include_yearly() -> bool:
     """从 settings.include_yearly_playlist 读开关，默认 True。"""
     try:
-        from .config import load_config
         cfg = load_config()
         v = (cfg.get("settings", {}) or {}).get("include_yearly_playlist")
         return v if isinstance(v, bool) else True

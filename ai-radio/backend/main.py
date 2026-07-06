@@ -322,6 +322,69 @@ def _track_not_found(entry: PlaylistEntry, message: str, suggestion: str) -> JSO
     )
 
 
+def _dispatch_track(entry: PlaylistEntry) -> tuple[Track | None, list[str]]:
+    """V4.0 多源调度第一跳：优先 QQ（entry.sources.qqmusic.songmid 走直链）。
+
+    返回 (track, dispatch_errors)。QQ 拿不到时 track=None、dispatch_errors 记录失败原因，
+    由调用方接网易兜底并决定是抛 404 还是 return None（两处兜底语义不同，故不搬进本函数）。
+    """
+    track: Track | None = None
+    dispatch_errors: list[str] = []
+    qq_src = (entry.sources or {}).get("qqmusic") if hasattr(entry, "sources") else None
+    if qq_src and qq_src.get("songmid"):
+        try:
+            track = qqmusic.get_track_by_songmid(
+                qq_src["songmid"],
+                title=entry.title,
+                artists=entry.artists,
+                album=entry.album,
+                album_mid=qq_src.get("album_mid", ""),
+                duration_ms=entry.duration_ms,
+            )
+        except Exception as e:
+            logger.warning(f"QQ 调度失败《{entry.title}》：{type(e).__name__}: {e}")
+            dispatch_errors.append(f"qq:{type(e).__name__}")
+        if track is None:
+            dispatch_errors.append("qq:no_track")
+            logger.info(f"QQ 拿不到《{entry.title}》直链，回退网易兜底")
+    return track, dispatch_errors
+
+
+def _build_episode_payload(
+    track: Track,
+    entry: PlaylistEntry,
+    mode: str,
+    script: str,
+    tts_url: str | None,
+    tts_fallback_reason: str | None,
+    llm_fallback_reason: str | None,
+    skipped_by_feedback: list[str] | None = None,
+    recommend_reason: str | None = None,
+) -> dict:
+    """组装一集的返回 payload（get_episode 与预热共用，逐 key 与原 dict 对齐）。"""
+    degraded: list[dict] = []
+    if llm_fallback_reason:
+        degraded.append({"stage": "llm", "reason": llm_fallback_reason})
+    if tts_fallback_reason:
+        degraded.append({"stage": "tts", "reason": tts_fallback_reason})
+    return {
+        "tts_url": tts_url,
+        "song_url": f"/api/v1/song/{track.source}/{track.source_id}",
+        "song_id": f"{track.source}/{track.source_id}",
+        "song_title": entry.title,
+        "artist": entry.artist,
+        "album": track.album,
+        "cover_url": track.cover_url,
+        "duration_ms": track.duration_ms,
+        "lyric": track.lyric,
+        "script": script,
+        "mode": mode,
+        "degraded": degraded,
+        "skipped_by_feedback": skipped_by_feedback if skipped_by_feedback is not None else [],
+        "recommend_reason": recommend_reason,
+    }
+
+
 # === 路由 ===
 def _probe_qqmusic_api(timeout: float = 1.0) -> dict:
     """探 QQMusicApi :8080 是否在跑（QQ 直链 / 歌词 / 扫码登录的唯一来源）。
@@ -472,26 +535,7 @@ def get_episode(
     SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # 1. V4.0 多源调度：优先 QQ（entry.sources.qqmusic.songmid 走直链），失败兜底网易
-    track: Track | None = None
-    dispatch_errors: list[str] = []
-
-    qq_src = (entry.sources or {}).get("qqmusic") if hasattr(entry, "sources") else None
-    if qq_src and qq_src.get("songmid"):
-        try:
-            track = qqmusic.get_track_by_songmid(
-                qq_src["songmid"],
-                title=entry.title,
-                artists=entry.artists,
-                album=entry.album,
-                album_mid=qq_src.get("album_mid", ""),
-                duration_ms=entry.duration_ms,
-            )
-        except Exception as e:
-            logger.warning(f"QQ 调度失败《{entry.title}》：{type(e).__name__}: {e}")
-            dispatch_errors.append(f"qq:{type(e).__name__}")
-        if track is None:
-            dispatch_errors.append("qq:no_track")
-            logger.info(f"QQ 拿不到《{entry.title}》直链，回退网易兜底")
+    track, dispatch_errors = _dispatch_track(entry)
 
     if track is None:
         try:
@@ -546,28 +590,17 @@ def get_episode(
         logger.exception("Fish Audio 合成失败，跳过旁白只播歌")
         tts_fallback_reason = f"tts_{type(e).__name__}"
 
-    degraded: list[dict] = []
-    if llm_fallback_reason:
-        degraded.append({"stage": "llm", "reason": llm_fallback_reason})
-    if tts_fallback_reason:
-        degraded.append({"stage": "tts", "reason": tts_fallback_reason})
-
-    return {
-        "tts_url": tts_url,
-        "song_url": f"/api/v1/song/{track.source}/{track.source_id}",
-        "song_id": f"{track.source}/{track.source_id}",
-        "song_title": entry.title,
-        "artist": entry.artist,
-        "album": track.album,
-        "cover_url": track.cover_url,
-        "duration_ms": track.duration_ms,
-        "lyric": track.lyric,
-        "script": script,
-        "mode": mode,
-        "degraded": degraded,
-        "skipped_by_feedback": skipped_by_feedback,
-        "recommend_reason": recommend_reason,
-    }
+    return _build_episode_payload(
+        track,
+        entry,
+        mode,
+        script,
+        tts_url,
+        tts_fallback_reason,
+        llm_fallback_reason,
+        skipped_by_feedback=skipped_by_feedback,
+        recommend_reason=recommend_reason,
+    )
 
 
 @app.get("/api/v1/tts/{hash_id}")
@@ -672,6 +705,7 @@ def get_feedback_stats():
             "dislike_skip_threshold": DISLIKE_SKIP_THRESHOLD,
         }
     by_song: dict[str, dict[str, int]] = {}
+    by_entry_raw: dict[str, dict[str, int]] = {}
     total = 0
     with FEEDBACK_PATH.open("r", encoding="utf-8") as f:
         for line in f:
@@ -689,8 +723,14 @@ def get_feedback_stats():
             if act in ("like", "dislike"):
                 by_song[sid][act] += 1
                 total += 1
+            # by_entry：与 _aggregate_feedback_by_entry 同键同逻辑，单遍同时产出
+            title = (rec.get("title") or "").strip()
+            artist = (rec.get("artist") or "").strip()
+            key = f"{title} - {artist}" if artist else title
+            if key and act in ("like", "dislike"):
+                stat = by_entry_raw.setdefault(key, {"like": 0, "dislike": 0})
+                stat[act] += 1
 
-    by_entry_raw = _aggregate_feedback_by_entry()
     by_entry = {
         k: {**v, "would_skip": v.get("dislike", 0) >= DISLIKE_SKIP_THRESHOLD}
         for k, v in by_entry_raw.items()
@@ -841,7 +881,7 @@ def search_location_endpoint(payload: LocationSearchPayload):
 
 class ConfigTestPayload(BaseModel):
     service: str = Field(..., pattern="^(llm|deepseek|fish_audio|netease|qqmusic|qweather)$")
-    provider: str | None = None  # 仅 service=llm 时生效；缺省走当前 settings.llm_provider
+    provider: str | None = None  # 仅 service=llm 时生效；缺省 deepseek
 
 
 @app.post("/api/v1/config/test")
@@ -849,7 +889,7 @@ def test_config_endpoint(payload: ConfigTestPayload):
     """连通性测试：调一次目标服务最小可用请求。
 
     LLM 测试：service 可填 llm（通用）或 deepseek（指定 provider）。
-    传 provider 时强制用该 provider 临测（不改全局 settings.llm_provider）。
+    传 provider 时强制用该 provider 临测。
     """
     service = payload.service
     try:
@@ -950,23 +990,7 @@ def _make_episode_for_prewarm(
         return None
 
     # 多源调度（QQ → netease）
-    track: Track | None = None
-    dispatch_errors: list[str] = []
-    qq_src = (entry.sources or {}).get("qqmusic") if hasattr(entry, "sources") else None
-    if qq_src and qq_src.get("songmid"):
-        try:
-            track = qqmusic.get_track_by_songmid(
-                qq_src["songmid"],
-                title=entry.title,
-                artists=entry.artists,
-                album=entry.album,
-                album_mid=qq_src.get("album_mid", ""),
-                duration_ms=entry.duration_ms,
-            )
-        except Exception as e:
-            dispatch_errors.append(f"qq:{type(e).__name__}")
-        if track is None:
-            dispatch_errors.append("qq:no_track")
+    track, dispatch_errors = _dispatch_track(entry)
 
     if track is None:
         try:
@@ -1006,28 +1030,15 @@ def _make_episode_for_prewarm(
         logger.warning(f"预热 TTS 失败《{entry.title}》：{e}")
         tts_fallback_reason = f"tts_{type(e).__name__}"
 
-    degraded: list[dict] = []
-    if llm_fallback_reason:
-        degraded.append({"stage": "llm", "reason": llm_fallback_reason})
-    if tts_fallback_reason:
-        degraded.append({"stage": "tts", "reason": tts_fallback_reason})
-
-    payload = {
-        "tts_url": tts_url,
-        "song_url": f"/api/v1/song/{track.source}/{track.source_id}",
-        "song_id": f"{track.source}/{track.source_id}",
-        "song_title": entry.title,
-        "artist": entry.artist,
-        "album": track.album,
-        "cover_url": track.cover_url,
-        "duration_ms": track.duration_ms,
-        "lyric": track.lyric,
-        "script": script,
-        "mode": mode,
-        "degraded": degraded,
-        "skipped_by_feedback": [],
-        "recommend_reason": None,  # 预热路径不暴露推荐原因（避免误导用户）
-    }
+    payload = _build_episode_payload(
+        track,
+        entry,
+        mode,
+        script,
+        tts_url,
+        tts_fallback_reason,
+        llm_fallback_reason,
+    )
     return PrewarmItem(
         payload=payload,
         voice_id=voice_id,
@@ -1046,7 +1057,6 @@ prewarm_queue.set_generator(_make_episode_for_prewarm)
 # 腾讯彻底废账号为止（不再每 3 个月手动重扫）。
 # 上游 QQMusicApi web 服务（L-1124/QQMusicApi）跑在 :8080，sqlite 在 third_party 项目下。
 
-QQ_API_BASE = "http://127.0.0.1:8080"
 QQ_API_SQLITE_PATH = (
     PROJECT_ROOT / "third_party" / "QQMusicApi" / "web" / "data" / "credentials.sqlite3"
 )
@@ -1127,7 +1137,7 @@ def qq_login_me():
 def qq_login_qrcode():
     """代理 QQMusicApi web 服务的 QR 二维码生成。返回 {data: {qr_type, identifier, img}}。"""
     try:
-        r = httpx.get(f"{QQ_API_BASE}/login/qrcode/qq", timeout=15.0, trust_env=False)
+        r = httpx.get(f"{qqmusic.QQ_API_BASE}/login/qrcode/qq", timeout=15.0, trust_env=False)
         r.raise_for_status()
         return r.json()
     except Exception as e:
@@ -1139,7 +1149,7 @@ def qq_login_status(identifier: str):
     """代理 QR 登录状态查询；event=0 (DONE) 时把 credential 写入 :8080 sqlite credential_store。"""
     try:
         r = httpx.get(
-            f"{QQ_API_BASE}/login/qrcode/qq/status",
+            f"{qqmusic.QQ_API_BASE}/login/qrcode/qq/status",
             params={"identifier": identifier},
             timeout=15.0,
             trust_env=False,

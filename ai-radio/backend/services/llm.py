@@ -1,6 +1,6 @@
 """LLM 主播稿生成（DeepSeek，OpenAI 兼容协议）
 
-provider 选择由 settings.llm_provider 决定，模型名由 settings.llm_model 决定
+LLM 固定为 DeepSeek（单一 provider），模型名由 settings.llm_model 决定
 （缺省走 PROVIDERS 配置里的 default_model）；详见 services/llm_providers.py。
 
 支持 3 个文案 mode：song_intro（纯歌曲介绍）/ song_intro_taste（结合听歌史的歌曲介绍）/ weather_mood（天气感悟）
@@ -8,7 +8,6 @@ provider 选择由 settings.llm_provider 决定，模型名由 settings.llm_mode
 接受 target_chars 参数实现 DJ 时间对齐（旁白长度 ≈ 前奏长度）
 """
 import logging
-from datetime import datetime
 from pathlib import Path
 from string import Template
 
@@ -92,11 +91,9 @@ def generate_script(
         raise ValueError(f"未知文案模式：{mode}，可选 {SUPPORTED_MODES}")
 
     client, model = build_client_and_model()
-    provider_label = get_provider_config()["label"]
 
     min_chars = max(20, target_chars - 15)
     max_chars = target_chars + 10
-    today = datetime.now().strftime("%Y 年 %m 月 %d 日")
 
     # 按 mode 注入真实事实，避免 LLM 编造。
     # song_intro（纯歌曲介绍）不注入任何素材；其余两档各自注入。
@@ -117,7 +114,6 @@ def generate_script(
         artist=artist or "（未署名）",
         min_chars=min_chars,
         max_chars=max_chars,
-        today=today,
         fact_block=fact_block,
     )
     user_msg = (
@@ -128,7 +124,7 @@ def generate_script(
     )
 
     logger.info(
-        f"调用 {provider_label} {model} 生成稿件 [mode={mode}]：{song_title}-{artist} (~{target_chars} 字)"
+        f"调用 {get_provider_config()['label']} {model} 生成稿件 [mode={mode}]：{song_title}-{artist} (~{target_chars} 字)"
     )
 
     completion = client.chat.completions.create(

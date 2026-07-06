@@ -142,9 +142,3 @@ def get_track_by_songmid(
         lyric=lyric,
         fee="free",
     )
-
-
-def reset_login() -> None:
-    """与 netease.reset_login 接口对齐。新方案下 cookie 由扫码登录页写 config.json，
-    adapter 每次都重读 → 无需缓存失效，noop。"""
-    pass

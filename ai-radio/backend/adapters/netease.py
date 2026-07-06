@@ -28,13 +28,11 @@ _RETRYABLE = (reqexc.ConnectionError, reqexc.Timeout, reqexc.ChunkedEncodingErro
 
 def _retry(fn: Callable[[], T], attempts: int = 3, delay: float = 1.5) -> T:
     """对网易云 API 调用做简单重试（应对 RemoteDisconnected 等瞬时断连）。"""
-    last_err: Optional[Exception] = None
     cur_delay = delay
     for i in range(attempts):
         try:
             return fn()
         except _RETRYABLE as e:
-            last_err = e
             if i == attempts - 1:
                 raise
             logger.warning(
@@ -42,8 +40,6 @@ def _retry(fn: Callable[[], T], attempts: int = 3, delay: float = 1.5) -> T:
             )
             time.sleep(cur_delay)
             cur_delay *= 1.5
-    assert last_err is not None
-    raise last_err
 
 logger = logging.getLogger(__name__)
 

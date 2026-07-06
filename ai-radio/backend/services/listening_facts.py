@@ -47,6 +47,20 @@ _FACTS_CACHE: dict[str, Any] | None = None            # 2025 详版（合并 yam
 _MULTIYEAR_CACHE: "dict[int, YearDigest] | None" = None  # 2018-2022 归一化
 
 
+def _merge_yaml_blocks(text: str, label: str = "") -> dict[str, Any]:
+    """把 text 内所有 ```yaml``` 块 safe_load 后合并到一个 dict。"""
+    merged: dict[str, Any] = {}
+    for block in _YAML_BLOCK_RE.findall(text):
+        try:
+            data = yaml.safe_load(block)
+        except yaml.YAMLError as e:
+            logger.warning(f"{label}YAML 块解析失败：{e}")
+            continue
+        if isinstance(data, dict):
+            merged.update(data)
+    return merged
+
+
 def _parse_report() -> dict[str, Any]:
     """读 2025 md 把所有 yaml 块合并到一个 dict。"""
     if not REPORT_PATH.exists():
@@ -54,16 +68,7 @@ def _parse_report() -> dict[str, Any]:
         return {}
 
     text = REPORT_PATH.read_text(encoding="utf-8")
-    merged: dict[str, Any] = {}
-    for block in _YAML_BLOCK_RE.findall(text):
-        try:
-            data = yaml.safe_load(block)
-        except yaml.YAMLError as e:
-            logger.warning(f"YAML 块解析失败：{e}")
-            continue
-        if isinstance(data, dict):
-            merged.update(data)
-    return merged
+    return _merge_yaml_blocks(text)
 
 
 def _load() -> dict[str, Any]:
@@ -262,18 +267,15 @@ def pick_for_entry(entry) -> str:
         composer = facts.get("yearly_composer") or {}
         lyricist = facts.get("yearly_lyricist") or {}
         if artist and _norm(composer.get("name")) == _norm(artist):
-            roles = []
-            if composer.get("name"):
-                roles.append("作曲")
+            roles = ["作曲"]
             if lyricist.get("name") and _norm(lyricist.get("name")) == _norm(artist):
                 roles.append("作词")
-            if roles:
-                tag_str = ""
-                if composer.get("tag") and lyricist.get("tag") and lyricist["tag"] != composer["tag"]:
-                    tag_str = f"——你的「{composer['tag']}」，也是你的「{lyricist['tag']}」"
-                elif composer.get("tag"):
-                    tag_str = f"——QQ 音乐叫他「{composer['tag']}」"
-                bullets.append(f"- {artist} 包揽了你 2025 年度{'+'.join(roles)}{tag_str}。")
+            tag_str = ""
+            if composer.get("tag") and lyricist.get("tag") and lyricist["tag"] != composer["tag"]:
+                tag_str = f"——你的「{composer['tag']}」，也是你的「{lyricist['tag']}」"
+            elif composer.get("tag"):
+                tag_str = f"——QQ 音乐叫他「{composer['tag']}」"
+            bullets.append(f"- {artist} 包揽了你 2025 年度{'+'.join(roles)}{tag_str}。")
 
         # 5. 命中 top_songs（年度 TOP 10）
         if entry.title:
@@ -463,15 +465,7 @@ def _load_multiyear() -> "dict[int, YearDigest]":
         except OSError as e:
             logger.warning(f"读取 {year} 听歌报告失败：{e}")
             continue
-        merged: dict[str, Any] = {}
-        for block in _YAML_BLOCK_RE.findall(text):
-            try:
-                data = yaml.safe_load(block)
-            except yaml.YAMLError as e:
-                logger.warning(f"{year} YAML 块解析失败：{e}")
-                continue
-            if isinstance(data, dict):
-                merged.update(data)
+        merged = _merge_yaml_blocks(text, label=f"{year} ")
         quotes = _extract_quotes(text)
         if merged or quotes:
             digests[year] = _normalize_year(year, merged, quotes)

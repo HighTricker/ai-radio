@@ -137,10 +137,9 @@ def _apply_2025_monthly_tags(by_key: dict[str, PlaylistEntry]) -> int:
     if not report.exists():
         return 0
 
-    data = _extract_yaml(report.read_text(encoding="utf-8"))
     # 2025 报告里有多个 yaml 块，第一个是 meta；要找 monthly 字段所在的块
-    # 用 finditer 重新扫所有 yaml 块
-    all_blocks = _YAML_BLOCK_RE.findall(report.read_text(encoding="utf-8"))
+    content = report.read_text(encoding="utf-8")
+    all_blocks = _YAML_BLOCK_RE.findall(content)
     monthly: dict | None = None
     for blk in all_blocks:
         try:

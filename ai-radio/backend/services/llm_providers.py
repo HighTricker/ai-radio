@@ -2,7 +2,7 @@
 
 为什么保留抽象层：
 - 用户在前端可以输 apikey
-- 未来加 OpenAI / Qwen / GLM 等只需往 PROVIDERS 加一条
+- 未来若加 OpenAI / Qwen / GLM 等，在 PROVIDERS 加一条并接回 provider 选择逻辑即可
 - llm.py 和 recommender.py 不再重复 base_url / default_model 常量
 """
 from openai import OpenAI
@@ -22,18 +22,9 @@ PROVIDERS: dict[str, dict] = {
 DEFAULT_PROVIDER = "deepseek"
 
 
-def get_current_provider() -> str:
-    """从 config.settings.llm_provider 读当前 provider；未配置或无效值 → 兜底 deepseek。"""
-    cfg = load_config()
-    p = (cfg.get("settings", {}) or {}).get("llm_provider")
-    if isinstance(p, str) and p in PROVIDERS:
-        return p
-    return DEFAULT_PROVIDER
-
-
 def get_provider_config(provider: str | None = None) -> dict:
-    """返回 provider 配置 dict。provider 缺省 → 当前。"""
-    pid = provider or get_current_provider()
+    """返回 provider 配置 dict。provider 缺省 → deepseek。"""
+    pid = provider or DEFAULT_PROVIDER
     if pid not in PROVIDERS:
         raise ValueError(f"未知 LLM provider: {pid}（可选 {list(PROVIDERS)}）")
     return PROVIDERS[pid]
@@ -41,7 +32,7 @@ def get_provider_config(provider: str | None = None) -> dict:
 
 def get_required_api_key_field() -> str:
     """返回当前 provider 对应的 apikey 字段名，给 _REQUIRED_KEYS 动态校验用。"""
-    return get_provider_config()["api_key_field"]
+    return "deepseek_api_key"
 
 
 def build_client_and_model(provider: str | None = None) -> tuple[OpenAI, str]:

@@ -48,15 +48,13 @@
       min-height: 100vh;
       line-height: 1.7;
       font-size: 14px;
-      padding: 1.5rem;
+      padding: 1.5rem 1.5rem 0;
       display: flex;
-      align-items: center;
+      align-items: stretch;
       justify-content: center;
       position: relative;
       overflow: hidden;
     }
-    /* 不再使用 CRT 扫描线 */
-    body::after { content: none !important; }
 
     /* === 漂浮光斑背景（3 个独立彩色光斑慢慢漂移） === */
     .orb {
@@ -98,7 +96,7 @@
     /* === 主卡片（stage 现在是卡片本身） === */
     .stage {
       position: relative;
-      z-index: 10;
+      z-index: 1;
       width: min(94vw, 720px);
       min-height: min(90vh, 760px);
       max-height: 95vh;
@@ -116,8 +114,6 @@
       overflow: hidden;
     }
 
-    .stage { position: relative; z-index: 1; }
-
     /* === 鼠标萤火虫粒子（移植自个人网站 archive-V5V6-hero/MouseFireflies.tsx） ===
        全屏 fixed canvas + pointer-events:none 不挡操作；z-index 50 飘在卡片之上但被 modal(200) 压住 */
     .cursor-fireflies {
@@ -128,223 +124,9 @@
       z-index: 50;
       pointer-events: none;
     }
-    /* Toast（status / error 浮动提示） */
-    .toast-stack {
-      position: fixed;
-      left: 50%;
-      bottom: calc(96px + 18px + 0.8rem); /* bar 高度 + bar 距底 + 间距 */
-      transform: translateX(-50%);
-      z-index: 95;
-      display: flex; flex-direction: column;
-      gap: 0.4rem;
-      pointer-events: none;
-    }
-    .toast {
-      padding: 0.5rem 1rem;
-      border-radius: var(--radius-sm);
-      background: rgba(0, 0, 0, 0.72);
-      color: rgba(255, 255, 255, 0.95);
-      font-size: 13px;
-      letter-spacing: 0.02em;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-      animation: toast-in 0.22s ease;
-      max-width: min(80vw, 460px);
-      text-align: center;
-    }
-    .toast.error {
-      background: rgba(196, 75, 75, 0.92);
-      white-space: pre-wrap;
-      text-align: left;
-      pointer-events: auto;
-      cursor: pointer;
-    }
-    @keyframes toast-in {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes toast-out {
-      to { opacity: 0; transform: translateY(8px); }
-    }
-    .toast.leaving { animation: toast-out 0.18s ease forwards; }
-
-    /* 给底部 bar 留出空间，氛围/萤火虫穿透展示 */
-    body { padding-bottom: 0; align-items: stretch; }
-
-    /* === 歌词面板（点击海报弹出，玻璃浮层） === */
-    .lyric-sheet {
-      position: fixed;
-      left: 50%;
-      bottom: calc(96px + 18px + 12px); /* bar 高 + bar 距底 + 间距 */
-      transform: translateX(-50%) translateY(24px);
-      width: calc(100% - 32px);
-      max-width: 920px;
-      height: min(60vh, 560px);
-      z-index: 85;
-      display: flex;
-      flex-direction: column;
-      background:
-        linear-gradient(180deg,
-          rgba(255, 255, 255, 0.78) 0%,
-          rgba(255, 255, 255, 0.6) 100%);
-      backdrop-filter: blur(32px) saturate(180%);
-      -webkit-backdrop-filter: blur(32px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.55);
-      border-radius: 28px;
-      box-shadow:
-        0 20px 60px rgba(20, 18, 38, 0.22),
-        0 4px 12px rgba(20, 18, 38, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.85),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.18);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.32s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-      overflow: hidden;
-    }
-    .lyric-sheet.open {
-      opacity: 1;
-      pointer-events: auto;
-      transform: translateX(-50%) translateY(0);
-    }
-    .lyric-sheet-header {
-      position: relative;
-      display: flex;
-      justify-content: center;
-      padding: 0.7rem 1.2rem 0.4rem;
-      flex-shrink: 0;
-    }
-    .lyric-sheet-handle {
-      width: 36px;
-      height: 4px;
-      border-radius: 2px;
-      background: rgba(0, 0, 0, 0.18);
-    }
-    .lyric-sheet-close {
-      position: absolute;
-      top: 0.45rem;
-      right: 0.7rem;
-      width: 28px;
-      height: 28px;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      font-size: 13px;
-      color: var(--text-secondary);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.2s;
-      font-family: var(--font-stack);
-    }
-    .lyric-sheet-close:hover { background: rgba(0, 0, 0, 0.06); }
-    .lyric-sheet-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0.2rem 1.6rem 1.5rem;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
-      position: relative; /* 让子元素 offsetTop 相对 content */
-    }
-    .lyric-sheet-content::-webkit-scrollbar { width: 6px; }
-    .lyric-sheet-content::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.14);
-      border-radius: 3px;
-    }
-    .lyric-empty {
-      text-align: center;
-      color: var(--text-fade);
-      padding: 2.5rem 0;
-      font-size: 13px;
-    }
-    .lyric-narration-wrap {
-      padding: 0.6rem 0 1rem;
-      text-align: center;
-    }
-    .lyric-narration {
-      display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
-      font-size: 15px;
-      line-height: 1.85;
-      letter-spacing: 0.02em;
-      text-align: center;
-    }
-    .lyric-narration-line {
-      color: var(--text-secondary);
-      opacity: 0.5;
-      transition: opacity 0.35s, color 0.35s, font-size 0.35s, font-weight 0.3s;
-    }
-    .lyric-narration-line.past { opacity: 0.3; }
-    .lyric-narration-line.active {
-      opacity: 1;
-      color: var(--text-primary);
-      font-weight: 600;
-      font-size: 17px;
-    }
-    .lyric-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.55rem;
-      padding-bottom: 40%; /* 底部留白，最后一句也能滚到中部 */
-      text-align: center;
-    }
-    .lyric-line {
-      font-size: 16px;
-      line-height: 1.6;
-      color: var(--text-secondary);
-      opacity: 0.55;
-      transition: opacity 0.3s, color 0.3s, font-size 0.3s;
-      letter-spacing: 0.01em;
-      text-align: center;
-    }
-    .lyric-line.past { opacity: 0.32; }
-    .lyric-line.active {
-      opacity: 1;
-      color: var(--text-primary);
-      font-weight: 600;
-      font-size: 18px;
-    }
-    /* 元信息行（作词作曲等）：常驻淡灰小字，不参与高亮 */
-    .lyric-line.meta {
-      font-size: 12px;
-      color: var(--text-fade);
-      opacity: 0.5;
-      font-weight: normal;
-      letter-spacing: 0.04em;
-    }
-    @media (max-width: 720px) {
-      .lyric-sheet {
-        bottom: calc(80px + 12px + 8px);
-        width: calc(100% - 16px);
-        height: min(58vh, 480px);
-        border-radius: 22px;
-      }
-      .lyric-narration { font-size: 14px; }
-      .lyric-line { font-size: 15px; }
-      .lyric-line.active { font-size: 17px; }
-    }
 
     /* === 配置页（覆盖层 modal） === */
-    .settings-trigger {
-      position: fixed;
-      bottom: 1.6rem;
-      right: 1.6rem;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: var(--button-bg);
-      border: 1px solid var(--border);
-      color: var(--text-primary);
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      transition: transform 0.2s, opacity 0.2s;
-      z-index: 100;
-      font-family: var(--font-stack);
-    }
     .settings-trigger:hover { transform: rotate(30deg); opacity: 0.9; }
-    .settings-trigger:active { transform: rotate(60deg) scale(0.95); }
 
     .config-overlay {
       position: fixed;
@@ -505,29 +287,6 @@
     .config-test-result.fail { color: var(--error); }
     .config-test-result.testing { color: var(--text-secondary); }
 
-    @media (max-width: 720px) {
-      .player-bar {
-        bottom: 12px;
-        width: calc(100% - 16px);
-        border-radius: 22px;
-        grid-template-columns: 1fr 1.6fr 1fr;
-        padding: 0.6rem 0.7rem;
-        gap: 0.5rem;
-      }
-      .toast-stack {
-        bottom: calc(80px + 12px + 0.6rem);
-      }
-      .pb-title { max-width: 100%; }
-      .pb-artist { display: none; }
-      .pb-feedback { gap: 0.2rem; }
-      .pb-fb-btn { width: 26px; height: 26px; }
-      .pb-ctrl { width: 32px; height: 32px; }
-      .pb-play { width: 38px; height: 38px; }
-      .pb-time { min-width: 32px; font-size: 10px; }
-    }
-    @media (max-width: 520px) {
-      .pb-env { display: none; }
-    }
     /* ===================================================
        打字机风专属 CSS（覆盖旧玻璃风）
        =================================================== */
@@ -863,9 +622,6 @@
       cursor: pointer;
     }
 
-    /* 旧 toast 浮层不再显示（DOM 保留兼容） */
-    .toast-stack { display: none !important; }
-
     /* === 响应式 === */
     @media (max-width: 760px) {
       body { padding: 1rem; }
@@ -950,8 +706,6 @@
       </div>
     </footer>
   </main>
-
-  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
   <!-- === 配置覆盖层（modal） === -->
   <div class="config-overlay" id="configOverlay" style="display:none">
@@ -1118,7 +872,6 @@
     const pbTimeTotal = $('pbTimeTotal');
     const pbProgressBar = $('pbProgressBar');
     const pbProgressThumb = $('pbProgressThumb');
-    const toastStack = $('toastStack');
     const lyricSheet = $('lyricSheet');
     const lyricSheetContent = $('lyricSheetContent');
     const lyricEmpty = $('lyricEmpty');
@@ -1127,11 +880,9 @@
     const lyricListEl = $('lyricList');
     let lyricLineEls = [];
     let lyricMetaFlags = [];
-    let lastActiveLyricIndex = -1;
     let narrationSegments = [];      // [{ text, charsStart, charsEnd }]
     let narrationSegmentEls = [];
     let narrationTotalChars = 0;
-    let lastActiveNarrationIndex = -1;
     let currentVoiceId = null;
     let currentMode = 'song_intro';
     const MODE_LABELS_ZH = {
@@ -1150,12 +901,6 @@
     }
 
     // === Toast（status / error 浮动提示，替代旧的状态文本和 error div） ===
-    function dismissToast(el) {
-      if (!el || !el.isConnected) return;
-      el.classList.add('leaving');
-      setTimeout(() => { if (el.isConnected) el.remove(); }, 200);
-    }
-    let lastErrorToast = null;
     const cardStatus = document.getElementById('cardStatus');
     let cardStatusFadeTimer = null;
     function setStatus(msg) {
@@ -1185,7 +930,6 @@
         cardStatus.textContent = '';
         cardStatus.onclick = null;
       }
-      if (lastErrorToast) { dismissToast(lastErrorToast); lastErrorToast = null; }
     }
     function formatTime(sec) {
       if (!isFinite(sec) || sec < 0) sec = 0;
@@ -1287,8 +1031,6 @@
       return /^(作词|作曲|编曲|出品|制作|演唱|混音|母带|和声|监制|录音|歌曲|专辑|发行|演奏|原唱|后期|配唱|工程|策划|文案|制作人)\s*[:：]/.test(text || '');
     }
     function renderLyricSheet(ep) {
-      lastActiveLyricIndex = -1;
-      lastActiveNarrationIndex = -1;
       lyricLineEls = [];
       lyricMetaFlags = [];
       narrationSegments = [];
@@ -1348,8 +1090,6 @@
         lyricMetaFlags.push(isMeta);
       }
       lyricListEl.appendChild(frag);
-      // 重置滚动到顶
-      lyricSheetContent.scrollTop = 0;
     }
 
     function updateLyricHighlight() {
@@ -1438,19 +1178,6 @@
           el.textContent = lines[i].text;
         }
       }
-    }
-
-    function openLyricSheet() {
-      lyricSheet.classList.add('open');
-      lyricSheet.setAttribute('aria-hidden', 'false');
-      // 立刻同步一次高亮（不等下一帧）
-      lastActiveLyricIndex = -1;
-      lastActiveNarrationIndex = -1;
-      updateLyricHighlight();
-    }
-    function closeLyricSheet() {
-      lyricSheet.classList.remove('open');
-      lyricSheet.setAttribute('aria-hidden', 'true');
     }
 
     function scheduleAutoNext(seconds = 3) {
@@ -2324,7 +2051,6 @@
       };
 
       const PALETTE = [{ born: [243, 180, 142], die: [255, 242, 230] }];  // 暖金白
-      const getPalette = () => PALETTE;
 
       let w = 0, h = 0, dpr = 1;
       let mouseX = 0, mouseY = 0, mouseInside = false;
@@ -2337,7 +2063,7 @@
         if (particles.length >= PHYS.maxParticles) return;
         const a = Math.random() * Math.PI * 2;
         const r = Math.sqrt(Math.random()) * PHYS.birthRadius;
-        const palette = getPalette();
+        const palette = PALETTE;
         const cp = palette[Math.floor(Math.random() * palette.length)];
         particles.push({
           x: mouseX + Math.cos(a) * r,
