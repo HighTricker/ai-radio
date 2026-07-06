@@ -533,18 +533,41 @@
     }
     .progress-track {
       width: 100%; height: 3px;
+      position: relative;
       background: rgba(255, 255, 255, 0.1);
       border-radius: 2px;
       overflow: hidden;
       display: block;
     }
+    /* 旁白区色带：时间条最左侧那段是「AI 主播解说」，拖进这里可重听旁白 */
+    .progress-narration {
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%; width: 0%;
+      background: rgba(255, 183, 0, 0.22);
+      z-index: 0;
+    }
     .progress-fill {
       display: block;
+      position: relative;   /* 盖在旁白区色带之上，进度仍清晰可见 */
+      z-index: 1;
       height: 100%;
       width: 0%;
       background: var(--accent);
       transition: width 0.1s linear;
       box-shadow: 0 0 6px rgba(255, 183, 0, 0.5);
+    }
+    /* 旁白↔歌曲 分界竖线标记 */
+    .progress-boundary {
+      position: absolute;
+      top: 50%; left: 0%;
+      width: 2px; height: 9px;
+      transform: translate(-1px, -50%);
+      background: var(--accent-bright, var(--accent));
+      border-radius: 1px;
+      opacity: 0.75;
+      pointer-events: none;
+      z-index: 2;
     }
     .progress-thumb {
       position: absolute;
@@ -696,8 +719,10 @@
           <span id="pbTimeNow">00:00</span>
           <span class="progress-bar" id="pbProgressBar" data-disabled="true">
             <span class="progress-track">
+              <span class="progress-narration" id="progressNarration" style="display:none"></span>
               <span class="progress-fill" id="progressFill"></span>
             </span>
+            <span class="progress-boundary" id="progressBoundary" style="display:none"></span>
             <span class="progress-thumb" id="pbProgressThumb"></span>
           </span>
           <span id="pbTimeTotal">00:00</span>
@@ -856,6 +881,8 @@
 
     let songOffsetSec = 0;
     let currentSongBuf = null;     // 全局保留歌曲 buffer，给 seek 重建用
+    let currentTtsBuf = null;      // 全局保留旁白 buffer，支持拖回旁白重听
+    let playBase = 0;              // 体验时间轴：上次(重)播时的 T 基准（秒）
     let isDragging = false;
 
     const $ = (id) => document.getElementById(id);
@@ -872,6 +899,8 @@
     const pbTimeTotal = $('pbTimeTotal');
     const pbProgressBar = $('pbProgressBar');
     const pbProgressThumb = $('pbProgressThumb');
+    const progressNarration = $('progressNarration');
+    const progressBoundary = $('progressBoundary');
     const lyricSheet = $('lyricSheet');
     const lyricSheetContent = $('lyricSheetContent');
     const lyricEmpty = $('lyricEmpty');
@@ -1095,7 +1124,7 @@
     function updateLyricHighlight() {
       if (!currentEpisode || !ctx) return;
 
-      const elapsed = ctx.currentTime - startedAt;
+      const elapsed = nowT();
 
       if (narrationSegmentEls.length > 0) {
         if (!narrationEnded) {
@@ -1230,63 +1259,20 @@
         const introEndSec = introEndMs / 1000;
         songOffsetSec = hasTts ? Math.max(0, introEndSec - ttsDur - 1) : 0;
         currentSongBuf = songBuf;
+        currentTtsBuf = hasTts ? ttsBuf : null;
+        ttsDuration = ttsDur;
+        totalDuration = songBuf.duration;
+        songEnded = false;
         pbTimeNow.textContent = '00:00';
-        pbTimeTotal.textContent = formatTime(songBuf.duration);
+        pbTimeTotal.textContent = formatTime(episodeDur());
         if (hasTts) {
           console.log(`[DJ align] 前奏 ${introEndSec.toFixed(1)}s · 旁白 ${ttsDur.toFixed(1)}s → 歌曲跳过 ${songOffsetSec.toFixed(1)}s`);
         }
 
-        // 旁白链路（仅 hasTts）
-        if (hasTts) {
-          ttsSource = ctx.createBufferSource();
-          ttsSource.buffer = ttsBuf;
-          const ttsGain = ctx.createGain();
-          ttsGain.gain.value = 1.0;
-          ttsSource.connect(ttsGain).connect(ctx.destination);
-        }
-
-        // 歌曲链路（有旁白时低音量起步等渐升，无旁白时直接 100%）
-        songSource = ctx.createBufferSource();
-        songSource.buffer = songBuf;
-        songGain = ctx.createGain();
-        songGain.gain.value = hasTts ? bgVolume : 1.0;
-        songSource.connect(songGain).connect(ctx.destination);
-
-        startedAt = ctx.currentTime;
-        if (hasTts) ttsSource.start(startedAt);
-        songSource.start(startedAt, songOffsetSec);
-        ttsDuration = ttsDur;
-        totalDuration = songBuf.duration;
-        songEnded = false;
-        narrationEnded = !hasTts;
-
-        // 旁白结束 → 歌曲渐升 100%；进度条启用
-        if (hasTts) {
-          ttsSource.onended = () => {
-            if (!ctx || songEnded) return;
-            narrationEnded = true;
-            songGain.gain.setValueAtTime(songGain.gain.value, ctx.currentTime);
-            songGain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + 3);
-            pbProgressBar.dataset.disabled = 'false';
-            setStatus('正在播放…');
-          };
-        } else {
-          // 无旁白：进度条立即启用
-          pbProgressBar.dataset.disabled = 'false';
-        }
-
-        songSource.onended = () => {
-          songEnded = true;
-          setStatus('节目结束');
-          playPauseBtn.disabled = false;
-          nextBtn.disabled = false;
-          stopProgress();
-          progressFill.style.width = '100%';
-          pbProgressThumb.style.left = '100%';
-          setPlayIcon(false);
-          // B002 修复：正常播完自动切下一首（给 2 秒短停顿，电台主播切歌的"喘气感"）
-          scheduleAutoNext(2);
-        };
+        // 时间轴标记（旁白/歌曲分界）+ 启用进度条，然后从体验时间 0 开始播
+        // 旁白轨 + 歌曲轨的接线、渐升、播完切歌，全部收敛进 playFrom() / onSongNaturalEnd()
+        updateTimelineMarkers();
+        playFrom(0);
 
         if (!hasTts) {
           setStatus(ttsDegraded ? '仅播放歌曲（旁白合成失败）' : '正在播放…');
@@ -1339,17 +1325,105 @@
       }
     }
 
+    // === 统一体验时间轴引擎（旁白 + 歌曲拼成一根可自由拖动的时间条）===
+    // 体验时间 T=0 是节目开始；T∈[0,ttsDuration) 为旁白区（旁白大声 + 歌曲小声垫底），
+    // T≥ttsDuration 为纯歌曲区。歌曲 buffer 播放位置 = T + songOffsetSec。
+    function episodeDur() {
+      return currentSongBuf ? Math.max(0.1, currentSongBuf.duration - songOffsetSec) : 0;
+    }
+    function nowT() {
+      if (!ctx) return 0;
+      return playBase + (ctx.currentTime - startedAt);
+    }
+    // 在时间条上画出旁白区色带 + 旁白/歌曲分界，并启用进度条
+    function updateTimelineMarkers() {
+      const dur = episodeDur();
+      const hasTts = !!currentTtsBuf && ttsDuration > 0.05;
+      if (hasTts && dur > 0) {
+        const r = Math.max(0, Math.min(1, ttsDuration / dur));
+        progressNarration.style.width = (r * 100) + '%';
+        progressNarration.style.display = '';
+        progressBoundary.style.left = (r * 100) + '%';
+        progressBoundary.style.display = '';
+      } else {
+        progressNarration.style.display = 'none';
+        progressBoundary.style.display = 'none';
+      }
+      pbProgressBar.dataset.disabled = 'false';
+    }
+    // 歌曲自然播完 → 结束节目并自动切下一首
+    function onSongNaturalEnd() {
+      songEnded = true;
+      setStatus('节目结束');
+      playPauseBtn.disabled = false;
+      nextBtn.disabled = false;
+      stopProgress();
+      progressFill.style.width = '100%';
+      pbProgressThumb.style.left = '100%';
+      setPlayIcon(false);
+      // 正常播完自动切下一首（给 2 秒短停顿，电台切歌的"喘气感"）
+      scheduleAutoNext(2);
+    }
+    // 从体验时间 T 处（重新）开始播放：按落点决定是否同时起旁白轨
+    function playFrom(T) {
+      if (!ctx || !currentSongBuf) return;
+      const dur = episodeDur();
+      T = Math.max(0, Math.min(dur - 0.05, T));
+
+      // 停掉旧的两条轨（先摘 onended，避免误触发结束/渐升逻辑）
+      if (ttsSource) { try { ttsSource.onended = null; ttsSource.stop(); } catch (_) {} ttsSource = null; }
+      if (songSource) { try { songSource.onended = null; songSource.stop(); } catch (_) {} songSource = null; }
+
+      const hasTts = !!currentTtsBuf && ttsDuration > 0.05;
+      const narrationActive = hasTts && T < ttsDuration - 0.05;
+
+      // songGain 整个节目复用一次（→ destination 只连一次），seek 时只换 source
+      if (!songGain) { songGain = ctx.createGain(); songGain.connect(ctx.destination); }
+      songGain.gain.cancelScheduledValues(ctx.currentTime);
+      songGain.gain.setValueAtTime(narrationActive ? bgVolume : 1.0, ctx.currentTime);
+
+      // 歌曲轨
+      songSource = ctx.createBufferSource();
+      songSource.buffer = currentSongBuf;
+      songSource.connect(songGain);
+      songSource.start(0, T + songOffsetSec);
+      songSource.onended = onSongNaturalEnd;
+
+      // 旁白轨（仅落点在旁白区时才起；起点在旁白中段则从中段续念）
+      if (narrationActive) {
+        ttsSource = ctx.createBufferSource();
+        ttsSource.buffer = currentTtsBuf;
+        const ttsGain = ctx.createGain();
+        ttsGain.gain.value = 1.0;
+        ttsSource.connect(ttsGain).connect(ctx.destination);
+        ttsSource.start(0, T);
+        ttsSource.onended = () => {
+          if (!ctx || songEnded) return;
+          narrationEnded = true;
+          songGain.gain.cancelScheduledValues(ctx.currentTime);
+          songGain.gain.setValueAtTime(songGain.gain.value, ctx.currentTime);
+          songGain.gain.linearRampToValueAtTime(1.0, ctx.currentTime + 3);
+          setStatus('正在播放…');
+        };
+      }
+      narrationEnded = !narrationActive;
+
+      // 重设体验时间基准
+      playBase = T;
+      startedAt = ctx.currentTime;
+      songEnded = false;
+    }
+
     function startProgress() {
       const tick = () => {
         if (!ctx || songEnded) return;
-        const elapsed = ctx.currentTime - startedAt;
-        const songCurrent = elapsed + songOffsetSec;
-        const dur = currentSongBuf ? currentSongBuf.duration : 0;
-        const pct = dur > 0 ? Math.min(100, (songCurrent / dur) * 100) : 0;
+        const t = nowT();
+        const dur = episodeDur();
+        const pct = dur > 0 ? Math.min(100, (t / dur) * 100) : 0;
         if (!isDragging) {
           progressFill.style.width = pct + '%';
           pbProgressThumb.style.left = pct + '%';
-          pbTimeNow.textContent = formatTime(songCurrent);
+          pbTimeNow.textContent = formatTime(t);
         }
         updateLyricHighlight();
         rafId = requestAnimationFrame(tick);
@@ -1395,7 +1469,7 @@
       return Math.max(0, Math.min(1, ratio));
     }
     function applyProgressVisual(ratio) {
-      const dur = currentSongBuf ? currentSongBuf.duration : 0;
+      const dur = episodeDur();
       progressFill.style.width = (ratio * 100) + '%';
       pbProgressThumb.style.left = (ratio * 100) + '%';
       pbTimeNow.textContent = formatTime(ratio * dur);
@@ -1404,6 +1478,8 @@
       if (pbProgressBar.dataset.disabled === 'true') return;
       if (!currentSongBuf) return;
       e.preventDefault();
+      // 拖动时取消挂起的"自动切下一首"，否则拖回重听会被切走
+      if (autoNextTimer) { clearInterval(autoNextTimer); autoNextTimer = null; }
       isDragging = true;
       pbProgressBar.classList.add('dragging');
       applyProgressVisual(progressRatioFromEvent(e));
@@ -1416,38 +1492,14 @@
       if (!isDragging) return;
       isDragging = false;
       pbProgressBar.classList.remove('dragging');
+      if (!currentSongBuf) return;
       const r = progressRatioFromEvent(e);
-      if (currentSongBuf) seekSong(r * currentSongBuf.duration);
-    }
-
-    function seekSong(targetSec) {
-      if (!ctx || songEnded) return;
-      if (!narrationEnded) return;  // 旁白阶段不允许跳（UI 已禁用，双保险）
-      if (!currentSongBuf || !songSource) return;
-      targetSec = Math.max(0, Math.min(currentSongBuf.duration - 0.1, targetSec));
-
-      try { songSource.onended = null; songSource.stop(); } catch (_) {}
-      songSource = ctx.createBufferSource();
-      songSource.buffer = currentSongBuf;
-      songSource.connect(songGain).connect(ctx.destination);
-      songSource.start(0, targetSec);
-
-      // 旁白早已结束，重设时间基准（songOffsetSec 改为新起点，startedAt 重置到现在）
-      startedAt = ctx.currentTime;
-      songOffsetSec = targetSec;
-
-      songSource.onended = () => {
-        songEnded = true;
-        setStatus('节目结束');
-        playPauseBtn.disabled = false;
-        nextBtn.disabled = false;
-        stopProgress();
-        progressFill.style.width = '100%';
-        pbProgressThumb.style.left = '100%';
-        setPlayIcon(false);
-        // B002 修复：seek 后正常播完也要自动切下一首
-        scheduleAutoNext(2);
-      };
+      // 统一时间轴 seek：落在旁白区就重听旁白（+歌曲垫底），落在歌曲区就纯歌曲满音量
+      playFrom(r * episodeDur());
+      // 若之前已播完（RAF 已停），重启进度循环并恢复播放态
+      setPlayIcon(!isPaused);
+      if (!rafId && !isPaused) startProgress();
+      setStatus(narrationEnded ? '正在播放…' : 'AI 主播回放中…');
     }
 
     function stopCurrent() {
@@ -1462,13 +1514,18 @@
         songSource = null;
       }
       if (ctx) { ctx.close(); ctx = null; }
+      songGain = null;
       songEnded = false;
       narrationEnded = false;
       isPaused = false;
       songOffsetSec = 0;
       currentSongBuf = null;
+      currentTtsBuf = null;
+      playBase = 0;
       progressFill.style.width = '0%';
       pbProgressThumb.style.left = '0%';
+      progressNarration.style.display = 'none';
+      progressBoundary.style.display = 'none';
       pbProgressBar.dataset.disabled = 'true';
       pbTimeNow.textContent = '00:00';
       pbTimeTotal.textContent = '00:00';
